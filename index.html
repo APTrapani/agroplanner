@@ -3215,7 +3215,7 @@ function renderDualColBars(containerId, entries, allContratas, maxVal, CONTRATA_
 
       if(hasPropio){
         const wP = Math.max((e.propio / e.total) * TRACK_W, 1.5);
-        rows += `<rect x="${curX.toFixed(1)}" y="${y}" width="${wP.toFixed(1)}" height="${BAR_H}" rx="${hasContratas?'4 0 0 4':'4'}" fill="${COLOR_PROPIO}"/>`;
+        rows += `<rect x="${curX.toFixed(1)}" y="${y}" width="${wP.toFixed(1)}" height="${BAR_H}" rx="4" fill="${COLOR_PROPIO}"/>`;
         if(multiSegmento) rows += `<text x="${(curX+wP/2).toFixed(1)}" y="${y+BAR_H/2+1}" text-anchor="middle" dominant-baseline="middle" font-size="10" font-weight="700" fill="#fff" font-family="var(--mono)">${e.propio}</text>`;
         curX += wP;
       }
@@ -3223,7 +3223,7 @@ function renderDualColBars(containerId, entries, allContratas, maxVal, CONTRATA_
         const wC = Math.max((cnt / e.total) * TRACK_W, 1.5);
         const color = CONTRATA_COLORS[allContratas.indexOf(c) % CONTRATA_COLORS.length][0];
         const isLast = ci === arr.length - 1;
-        const rx = isLast ? (hasPropio||ci>0 ? '0 4 4 0' : '4') : '0';
+        const rx = isLast ? '4' : '0';
         rows += `<rect x="${curX.toFixed(1)}" y="${y}" width="${wC.toFixed(1)}" height="${BAR_H}" rx="${rx}" fill="${color}"/>`;
         if(multiSegmento) rows += `<text x="${(curX+wC/2).toFixed(1)}" y="${y+BAR_H/2+1}" text-anchor="middle" dominant-baseline="middle" font-size="10" font-weight="700" fill="#fff" font-family="var(--mono)">${cnt}</text>`;
         curX += wC;

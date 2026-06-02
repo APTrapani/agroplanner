@@ -39,7 +39,7 @@ window.AgroPlanner = {
   StateManager,
   AuditService,
   AuthService,
-  SheetsService,
+  SheetsService, // incluye: enviarRegistro, cargarTodo, pushMaestro, enviarHojaRegistros, cargarGviz
   // Fase 3: componentes UI
   Toast:    { toast, sync },
   SS:       { ssLoad, ssGetValue, ssReset, ssOpen, ssBlur, ssCloseOne, ssCloseAll, ssInputFilter, ssFilter, ssRenderList, ssPick, ssClear },

@@ -241,6 +241,38 @@ export const SheetsService = Object.freeze({
   },
 
   /**
+   * Reemplaza toda la hoja de Registros en Sheets con los datos en memoria.
+   * Usado al editar o eliminar registros desde el módulo de Reportes.
+   *
+   * @param {Object[]} registros — array de registros de S.registros
+   * @param {string} appsScriptUrl
+   * @returns {Promise<void>}
+   * @throws {Error} si el reemplazo falla
+   */
+  async enviarHojaRegistros(registros, appsScriptUrl) {
+    const headers = ['Fecha','Hora Inicio','Hora Término','Área','Responsable','Lote(s)',
+                     'Tipo Personal','Contratista','Actividad','Tarea/Meta','N° Personas',
+                     'Observaciones','Registrado por','Timestamp'];
+    const rows = registros.map(r => [
+      r.fecha, r.hora, r.horaFin || '', r.area, r.responsable, r.lotes || '',
+      r.tipo, r.contratista || '', r.actividad, r.tarea || '', r.nPersonas,
+      r.obs || '', r.registradoPor || '', r.timestamp || '',
+    ]);
+    const body = JSON.stringify({ accion: 'reemplazar', sheet: 'Registros', datos: [headers, ...rows] });
+    try {
+      await _fetchWithTimeout(appsScriptUrl, {
+        method:  'POST',
+        headers: { 'Content-Type': 'text/plain' },
+        body,
+      });
+      AuditService.log('sheets.registros.reemplazados', { total: registros.length });
+    } catch (e) {
+      AuditService.logError('sheets.enviarHojaRegistros', e);
+      throw e;
+    }
+  },
+
+  /**
    * Parsea el array de filas de registros que devuelve Sheets.
    * Filtra filas vacías o con fecha inválida.
    *

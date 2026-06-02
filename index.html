@@ -5144,12 +5144,10 @@ async function descargarPDF(){
 }
 
 
+// reemplazarRegistrosEnSheets — delegada a SheetsService.enviarHojaRegistros
 async function reemplazarRegistrosEnSheets(){
-  // Reemplaza toda la hoja de Registros con los datos en memoria
-  const headers = ['Fecha','Hora Inicio','Hora Término','Área','Responsable','Lote(s)','Tipo Personal','Contratista','Actividad','Tarea/Meta','N° Personas','Observaciones','Registrado por','Timestamp'];
-  const rows = S.registros.map(r=>[r.fecha,r.hora,r.horaFin||'',r.area,r.responsable,r.lotes||'',r.tipo,r.contratista||'',r.actividad,r.tarea||'',r.nPersonas,r.obs||'',r.registradoPor||'',r.timestamp||'']);
   try{
-    await window.AgroPlanner.SheetsService.pushMaestro('registros_hoja', headers, rows, CFG.APPS_SCRIPT_URL);
+    await window.AgroPlanner.SheetsService.enviarHojaRegistros(S.registros, CFG.APPS_SCRIPT_URL);
     sync('ok','sincronizado');
   }catch(e){ sync('err','error'); throw e; }
 }

@@ -27,18 +27,13 @@
 import { fechaLarga, isoHoy } from '../../core/utils.js';
 
 // ─────────────────────────────────────────────
-// Helpers de acceso a estado del monolito
-// Durante la migración, S y DB viven en el monolito como variables globales.
-// Estos helpers los leen de forma segura sin asumir window.S === monolith S.
+// Helpers de acceso al estado global
+// Fase 6: window.S y window.DB son ahora la única fuente de verdad.
 // ─────────────────────────────────────────────
 function _getRegistros() {
-  // Priorizar la variable S del monolito (scope global de script inline)
-  if (typeof S !== 'undefined' && Array.isArray(S.registros)) return S.registros;
-  if (window.S?.registros) return window.S.registros;
-  return [];
+  return window.S?.registros || [];
 }
 function _getMaestroActividades() {
-  if (typeof DB !== 'undefined') return DB.maestros?.actividades || [];
   return window.DB?.maestros?.actividades || [];
 }
 

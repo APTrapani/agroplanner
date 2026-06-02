@@ -1457,11 +1457,12 @@ tr.reg-selected td{background:rgba(74,153,96,.06)!important}
 
 <script>
 /* ═══════════ CONFIG ═══════════ */
-const CFG={
+window.CFG={
   APPS_SCRIPT_URL:'https://script.google.com/macros/s/AKfycbz06r4ZEXqk1muDdze7X6_mmcLKL6au0Ze2EUAENNrEm1V-rTMwloXoTMBGMsFfcV_VMg/exec',
   SHEET_ID:'1X2LIIsoR3Q35oCjQmWlEqrpoVDAkcyjGLBwfMTBIGCg',
   SHEET_NAME:'Registros'
 };
+const CFG = window.CFG; // alias para compatibilidad con código existente
 
 /* ═══════════ DB ═══════════ */
 /* ⚠️  AVISO DE SEGURIDAD: Las contraseñas se almacenan en texto plano en localStorage.
@@ -1489,9 +1490,12 @@ const DB_DEF={
   }
 };
 
-let DB=(()=>{try{const s=localStorage.getItem(DB_KEY);return s?JSON.parse(s):JSON.parse(JSON.stringify(DB_DEF));}catch{return JSON.parse(JSON.stringify(DB_DEF));}})();
-const save=()=>localStorage.setItem(DB_KEY,JSON.stringify(DB));
-let S={usuario:null,lotes:[],lotesMap:{},registros:[],editUserId:null,editCultivoIdx:null,confirmCb:null,seg:'hoy'};
+window.DB=(()=>{try{const s=localStorage.getItem(DB_KEY);return s?JSON.parse(s):JSON.parse(JSON.stringify(DB_DEF));}catch{return JSON.parse(JSON.stringify(DB_DEF));}})();
+let DB = window.DB; // alias para compatibilidad con código existente
+const save=()=>{localStorage.setItem(DB_KEY,JSON.stringify(window.DB));window.DB=DB;};
+window.save = save; // exponer para módulos ES
+window.S={usuario:null,lotes:[],lotesMap:{},registros:[],editUserId:null,editCultivoIdx:null,confirmCb:null,seg:'hoy'};
+let S = window.S; // alias para compatibilidad con código existente
 
 /* ═══════════ UTILS ═══════════ */
 const isoHoy=()=>{ const d=new Date(); const pad=n=>String(n).padStart(2,'0'); return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate()); };
@@ -2359,7 +2363,7 @@ async function jalarTodoDeSheets(){
   toast('Jalando datos de Sheets…');
   try{
     const { registros, maestros } = await window.AgroPlanner.SheetsService.cargarTodo(CFG.APPS_SCRIPT_URL);
-    S.registros = registros;
+    S.registros.splice(0, S.registros.length, ...registros); // mantiene la referencia compartida con window.S
     const tipos = ['areas','responsables','cultivos','actividades','contratas'];
     let actualizados = 0;
     for(const tipo of tipos){
@@ -2482,7 +2486,7 @@ async function cargarRegistros(){
   sync('load','sincronizando…');
   try{
     const { registros, maestros } = await window.AgroPlanner.SheetsService.cargarTodo(CFG.APPS_SCRIPT_URL);
-    S.registros = registros;
+    S.registros.splice(0, S.registros.length, ...registros); // mantiene la referencia compartida con window.S
     // Aplicar maestros recibidos
     const tipos = ['areas','responsables','cultivos','actividades','contratas'];
     for(const tipo of tipos){
@@ -2493,6 +2497,8 @@ async function cargarRegistros(){
     renderInicio();
     renderReportes();
     initForm();
+    // Notificar a módulos ES que los datos están listos
+    document.dispatchEvent(new CustomEvent('agroplanner:data-ready'));
   }catch(e){
     console.warn('Apps Script falló, intentando gviz:', e.message);
     try{
@@ -2507,7 +2513,8 @@ async function cargarRegistros(){
 
 // cargarRegistrosGviz — delegada a SheetsService (fallback cuando Apps Script falla)
 async function cargarRegistrosGviz(){
-  S.registros = await window.AgroPlanner.SheetsService.cargarGviz(CFG.SHEET_ID, CFG.SHEET_NAME);
+  const _gvizRegs = await window.AgroPlanner.SheetsService.cargarGviz(CFG.SHEET_ID, CFG.SHEET_NAME);
+  S.registros.splice(0, S.registros.length, ..._gvizRegs); // mantiene la referencia compartida con window.S
   sync('ok','en línea (gviz)');
   renderInicio();
   renderReportes();
@@ -5071,7 +5078,8 @@ function eliminarRegistrosSeleccionados(){
   const isAdmin = S.usuario?.rol==='admin';
   if(!isAdmin || !regSeleccionados.size) return;
   abrirConfirm('Eliminar <strong>'+regSeleccionados.size+'</strong> registro(s) seleccionado(s)?<br><small style="color:var(--text-muted)">Esta acción también actualizará Google Sheets.</small>',async()=>{
-    S.registros = S.registros.filter((_,i)=>!regSeleccionados.has(i));
+    const _filtered = S.registros.filter((_,i)=>!regSeleccionados.has(i));
+    S.registros.splice(0, S.registros.length, ..._filtered); // mantiene referencia window.S
     regSeleccionados.clear();
     save();
     renderReportes();

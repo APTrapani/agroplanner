@@ -231,22 +231,7 @@ export const StateManager = Object.freeze({
 // en Fase 1 porque state.js aún no se importa en el monolito).
 // Cuando en Fase 2 se importe state.js en el monolito, estos aliases entrarán en uso.
 
-if (typeof window !== 'undefined') {
-  // Alias para compatibilidad durante la migración
-  // window.DB apunta al mismo objeto que StateManager.getDB() retorna
-  Object.defineProperty(window, 'DB', {
-    get: () => StateManager.getDB(),
-    set: (v) => { /* ignorado: usar StateManager.setUsuarios() o updateMaestro() */ },
-    configurable: true,
-  });
-
-  // window.S apunta al mismo objeto que StateManager.getSession() retorna
-  Object.defineProperty(window, 'S', {
-    get: () => StateManager.getSession(),
-    set: (v) => { /* ignorado */ },
-    configurable: true,
-  });
-
-  // window.save() delega a StateManager.save()
-  window.save = () => StateManager.save();
-}
+// FASE 6: window.S, window.DB y window.save son definidos por el monolito (index.html).
+// Eliminar estas definiciones evita el conflicto donde window.S retornaba el objeto
+// interno de StateManager en lugar del S real del monolito.
+// Los módulos ES leen window.S directamente y obtienen los datos correctos.

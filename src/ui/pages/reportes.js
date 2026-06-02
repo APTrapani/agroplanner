@@ -17,19 +17,16 @@
 
 import { fechaCorta, isoHoy } from '../../core/utils.js';
 
-// Helpers de acceso a estado del monolito
+// Helpers de acceso al estado global
+// Fase 6: window.S es ahora la única fuente de verdad.
 function _getRegistros() {
-  if (typeof S !== 'undefined' && Array.isArray(S.registros)) return S.registros;
-  if (window.S?.registros) return window.S.registros;
-  return [];
+  return window.S?.registros || [];
 }
 function _getUsuario() {
-  if (typeof S !== 'undefined') return S.usuario;
   return window.S?.usuario;
 }
 function _getRegSeleccionados() {
-  if (typeof regSeleccionados !== 'undefined') return regSeleccionados;
-  return new Set();
+  return typeof regSeleccionados !== 'undefined' ? regSeleccionados : new Set();
 }
 
 

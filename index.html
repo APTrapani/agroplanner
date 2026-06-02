@@ -1566,90 +1566,53 @@ function pFil(id,lista,label){
 }
 
 /* ═══════════ AUTH ═══════════ */
+// doLogin — delegada a AuthService
 async function doLogin(){
-  const user = document.getElementById('inp-user').value.trim();
-  const pass = document.getElementById('inp-pass').value;
-  const err  = document.getElementById('login-err');
-  const errT = document.getElementById('login-err-t');
-  const btn  = document.querySelector('#login-screen .btn-primary');
+  const user    = document.getElementById('inp-user').value.trim();
+  const pass    = document.getElementById('inp-pass').value;
+  const err     = document.getElementById('login-err');
+  const errT    = document.getElementById('login-err-t');
+  const btn     = document.querySelector('#login-screen .btn-primary');
   if(!user||!pass){ errT.textContent='Ingresa tu usuario y contraseña.'; err.classList.add('show'); return; }
   err.classList.remove('show');
   const origHTML = btn.innerHTML;
   btn.disabled = true;
   btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;animation:spin 1s linear infinite"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg> Verificando…';
 
-  let source = 'local';
-  try{
-    const ctrl = new AbortController();
-    const tid  = setTimeout(()=>ctrl.abort(), 10000);
-    const res  = await fetch(CFG.APPS_SCRIPT_URL+'?accion=leer&sheet=Maestro_Usuarios', {signal:ctrl.signal});
-    clearTimeout(tid);
-    if(res.ok){
-      const json = await res.json();
-      if(json.status==='ok' && json.datos?.length>1){
-        const sheetsUsers = json.datos.slice(1).map(r=>({
-          id:String(r[0]||''), nombre:String(r[1]||''), usuario:String(r[2]||''),
-          password:String(r[3]||''), rol:String(r[4]||'supervisor'), estado:String(r[5]||'Activo'),
-          perms:(()=>{try{return JSON.parse(r[6]||'{}');}catch{return {inicio:true,nuevo:true,reportes:true,exportar:false};}})(),
-          lastAccess:String(r[7]||'')
-        })).filter(u=>u.usuario);
-        if(sheetsUsers.length){ DB.usuarios=sheetsUsers; save(); }
-        source='sheets';
-      }
-    }
-  }catch(e){ source='local'; }
+  const result = await window.AgroPlanner.AuthService.login(user, pass, DB.usuarios, CFG.APPS_SCRIPT_URL);
 
-  btn.disabled=false; btn.innerHTML=origHTML;
+  btn.disabled = false;
+  btn.innerHTML = origHTML;
 
-  /* PARCHE-5: verificar contraseña con hash SHA-256 (compatible con legado texto plano) */
-  let found = null;
-  for(const u of DB.usuarios){
-    if(u.usuario === user && (u.estado||'Activo') === 'Activo'){
-      const match = await _verifyPassword(pass, u.password);
-      if(match){ found = u; break; }
-    }
+  if(!result.ok){
+    errT.textContent = result.message;
+    err.classList.add('show');
+    return;
   }
-  if(!found){
-    errT.textContent = source==='local'
-      ? 'Sin conexión o credenciales incorrectas. Verifica tu red e intenta de nuevo.'
-      : 'Usuario o contraseña incorrectos.';
-    err.classList.add('show'); return;
-  }
+
   err.classList.remove('show');
-  found.lastAccess=new Date().toISOString(); save(); pushUsuariosASheets().catch(()=>{});
-  S.usuario=found;
-  sessionStorage.setItem('agro_session', JSON.stringify({id:found.id,usuario:found.usuario}));
-  document.getElementById('login-screen').style.display='none';
-  document.getElementById('app').style.display='flex';
-  document.getElementById('topbar-date').textContent=fechaLarga();
-  document.getElementById('topbar-name').textContent=found.nombre;
-  document.getElementById('topbar-role').textContent=found.rol;
-  document.getElementById('topbar-av').textContent=initials(found.nombre);
-  aplicarPermisos(found);
+  const found = result.usuario;
+  found.lastAccess = new Date().toISOString();
+  save();
+  pushUsuariosASheets().catch(()=>{});
+  S.usuario = found;
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('app').style.display = 'flex';
+  window.AgroPlanner.AuthService.applyPermissions(found);
   iniciarApp();
   initMobUI();
   setTimeout(()=>VE.init(), 300);
 }
 
+// aplicarPermisos — delegada a AuthService
 function aplicarPermisos(u){
-  const isAdmin=u.rol==='admin';
-  const perms=u.perms||PERMS_DEF;
-  // Sidebar config solo admin
-  document.getElementById('sidebar-cfg').style.display=isAdmin?'flex':'none';
-  // Módulos según permisos
-  const navNuevo=document.getElementById('nav-nuevo');
-  const navRep=document.getElementById('nav-reportes');
-  if(navNuevo)navNuevo.style.display=(isAdmin||perms.nuevo)?'':'none';
-  if(navRep)navRep.style.display=(isAdmin||perms.reportes)?'':'none';
+  window.AgroPlanner.AuthService.applyPermissions(u);
 }
 
+// doLogout — delegada a AuthService
 function doLogout(){
-  S.usuario=null;
-  sessionStorage.removeItem('agro_session');
-  document.getElementById('app').style.display='none';
-  document.getElementById('login-screen').style.display='flex';
-  document.getElementById('inp-user').value='';
-  document.getElementById('inp-pass').value='';
+  S.usuario = null;
+  window.AgroPlanner.AuthService.logout();
 }
 
 /* ═══════════ NAV ═══════════ */
@@ -2335,35 +2298,17 @@ function rowsToMaestro(tipo, rows){
 async function pushUsuariosASheets(){
   const headers = MAESTROS_HEADERS.usuarios;
   const rows = maestroToRows('usuarios');
-  const body = JSON.stringify({accion:'reemplazar', sheet:'Maestro_Usuarios', datos:[headers, ...rows]});
-  const ctrl = new AbortController();
-  const tid = setTimeout(()=>ctrl.abort(), 15000);
   try{
-    const res = await fetch(CFG.APPS_SCRIPT_URL, {method:'POST', headers:{'Content-Type':'text/plain'}, body, signal:ctrl.signal});
-    clearTimeout(tid);
-    if(!res.ok) throw new Error('HTTP '+res.status);
-    const json = await res.json();
-    if(json.status!=='ok') throw new Error(json.message||'Error');
+    await window.AgroPlanner.SheetsService.pushMaestro('usuarios', headers, rows, CFG.APPS_SCRIPT_URL);
     sync('ok','sincronizado');
-  }catch(e){ clearTimeout(tid); sync('err','error'); throw e; }
+  }catch(e){ sync('err','error'); throw e; }
 }
 
-// Enviar un maestro completo a Sheets (reemplaza toda la hoja)
+// Enviar un maestro completo a Sheets — delegada a SheetsService
 async function pushMaestroASheets(tipo){
-  const sheet = MAESTROS_SHEETS[tipo];
-  if(!sheet) return;
   const headers = MAESTROS_HEADERS[tipo];
   const rows = maestroToRows(tipo);
-  const body = JSON.stringify({accion:'reemplazar', sheet, datos:[headers, ...rows]});
-  const ctrl = new AbortController();
-  const tid = setTimeout(()=>ctrl.abort(), 15000);
-  try{
-    const res = await fetch(CFG.APPS_SCRIPT_URL, {method:'POST', headers:{'Content-Type':'text/plain'}, body, signal:ctrl.signal});
-    clearTimeout(tid);
-    if(!res.ok) throw new Error('HTTP '+res.status);
-    const json = await res.json();
-    if(json.status!=='ok') throw new Error(json.message||'Error');
-  } catch(e){ clearTimeout(tid); throw e; }
+  await window.AgroPlanner.SheetsService.pushMaestro(tipo, headers, rows, CFG.APPS_SCRIPT_URL);
 }
 
 // Cargar un maestro desde Sheets
@@ -2384,58 +2329,23 @@ async function pullMaestroDeSheets(tipo){
 
 // Sincronizar TODO en una sola llamada (registros pendientes + todos los maestros)
 // Jalar TODO desde Sheets → reemplazar localStorage (cualquier usuario)
+// jalarTodoDeSheets — delegada a SheetsService
 async function jalarTodoDeSheets(){
   toast('Jalando datos de Sheets…');
-  const ctrl = new AbortController();
-  const tid = setTimeout(()=>ctrl.abort(), 20000);
   try{
-    const url = CFG.APPS_SCRIPT_URL + '?accion=leer_todo';
-    const res = await fetch(url, {signal:ctrl.signal});
-    clearTimeout(tid);
-    if(!res.ok) throw new Error('HTTP '+res.status);
-    const json = await res.json();
-    if(json.status!=='ok') throw new Error(json.message||'Error del servidor');
-
-    const m = json.todo;
+    const { registros, maestros } = await window.AgroPlanner.SheetsService.cargarTodo(CFG.APPS_SCRIPT_URL);
+    S.registros = registros;
+    const tipos = ['areas','responsables','cultivos','actividades','contratas'];
     let actualizados = 0;
-
-    // Reemplazar cada maestro si Sheets tiene datos
-    if(m.areas?.length > 1){        DB.maestros.areas        = rowsToMaestro('areas',        m.areas.slice(1));        actualizados++; }
-    if(m.responsables?.length > 1){ DB.maestros.responsables = rowsToMaestro('responsables', m.responsables.slice(1)); actualizados++; }
-    if(m.cultivos?.length > 1){     DB.maestros.cultivos     = rowsToMaestro('cultivos',     m.cultivos.slice(1));     actualizados++; }
-    if(m.actividades?.length > 1){  DB.maestros.actividades  = rowsToMaestro('actividades',  m.actividades.slice(1));  actualizados++; }
-    if(m.contratas?.length > 1){    DB.maestros.contratas    = rowsToMaestro('contratas',    m.contratas.slice(1));    actualizados++; }
-    if(m.usuarios?.length > 1){
-      const nuevosUsers = rowsToMaestro('usuarios', m.usuarios.slice(1));
-      if(nuevosUsers.length) DB.usuarios = nuevosUsers;
-      actualizados++;
+    for(const tipo of tipos){
+      if(maestros[tipo]){ DB.maestros[tipo] = rowsToMaestro(tipo, maestros[tipo]); actualizados++; }
     }
-
-    // Reemplazar registros si vienen
-    if(m.registros?.length > 1){
-      const dataRows = m.registros.slice(1);
-      S.registros = dataRows.map(r=>{
-        if(!r||!r[0]) return null;
-        const fecha = limpiarFecha(r[0]);
-        if(!fecha || fecha.toLowerCase()==='fecha') return null;
-        return {
-          fecha, hora:limpiarHora(r[1]), horaFin:limpiarHora(r[2]),
-          area:String(r[3]||''), responsable:String(r[4]||''), lotes:String(r[5]||''),
-          tipo:String(r[6]||''), contratista:String(r[7]||''), actividad:String(r[8]||''),
-          tarea:String(r[9]||''), nPersonas:parseInt(r[10])||0,
-          obs:String(r[11]||''), registradoPor:String(r[12]||''),
-          timestamp:String(r[13]||'')||('ts-'+Math.random().toString(36).slice(2))
-        };
-      }).filter(Boolean);
-    }
-
     save();
     initForm();
     renderInicio();
     renderReportes();
     toast(`Sincronizado ✓ — ${actualizados} maestros + registros actualizados`, 'ok');
   }catch(e){
-    clearTimeout(tid);
     toast('Error al sincronizar: '+e.message, 'err');
   }
 }
@@ -2454,20 +2364,12 @@ async function publicarMaestro(tipo, event){ /* PARCHE-3: event como parámetro 
   const nombre = MAESTROS_SHEETS[tipo];
   if(!nombre) return;
   toast('Publicando '+tipo+'…');
-  const ctrl = new AbortController();
-  const tid = setTimeout(()=>ctrl.abort(), 15000);
   try{
     const headers = MAESTROS_HEADERS[tipo];
     const rows = maestroToRows(tipo);
-    const body = JSON.stringify({accion:'reemplazar', sheet:nombre, datos:[headers,...rows]});
-    const res = await fetch(CFG.APPS_SCRIPT_URL, {method:'POST', headers:{'Content-Type':'text/plain'}, body, signal:ctrl.signal});
-    clearTimeout(tid);
-    if(!res.ok) throw new Error('HTTP '+res.status);
-    const json = await res.json();
-    if(json.status!=='ok') throw new Error(json.message||'Error');
+    await window.AgroPlanner.SheetsService.pushMaestro(tipo, headers, rows, CFG.APPS_SCRIPT_URL);
     toast(tipo+' publicado ✓ ('+rows.length+' registros)', 'ok');
   }catch(e){
-    clearTimeout(tid);
     toast('Error al publicar: '+e.message, 'err');
   }
 }
@@ -2488,18 +2390,9 @@ async function saveYSync(tipo, btnId=null){
   }
 }
 
-/* ═══════════ SHEETS API ═══════════ */
+/* ═══════════ SHEETS API — delegada a SheetsService ═══════════ */
 async function enviarASheets(reg){
-  const ctrl=new AbortController();
-  const tid=setTimeout(()=>ctrl.abort(),12000);
-  try{
-    const body=JSON.stringify({accion:'insertar',datos:[reg.fecha,reg.hora,reg.horaFin||'',reg.area,reg.responsable,reg.lotes,reg.tipo,reg.contratista||'',reg.actividad,reg.tarea||'',reg.nPersonas,reg.obs,reg.registradoPor,reg.timestamp]});
-    const res=await fetch(CFG.APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body,signal:ctrl.signal});
-    clearTimeout(tid);
-    if(!res.ok)throw new Error('HTTP '+res.status);
-    const json=await res.json();
-    if(json.status!=='ok')throw new Error(json.message||'Error');
-  }catch(e){clearTimeout(tid);throw e;}
+  await window.AgroPlanner.SheetsService.enviarRegistro(reg, CFG.APPS_SCRIPT_URL);
 }
 
 
@@ -2559,93 +2452,40 @@ function limpiarHora(val){
   return s;
 }
 
+// cargarRegistros — delegada a SheetsService
 async function cargarRegistros(){
   sync('load','sincronizando…');
   try{
-    // leer_todo: trae registros + todos los maestros en UNA sola llamada
-    const url = CFG.APPS_SCRIPT_URL + '?accion=leer_todo';
-    const res = await fetch(url);
-    if(!res.ok) throw new Error('HTTP '+res.status);
-    const json = await res.json();
-
-    if(json.status === 'ok' && json.todo){
-      // ── Registros ──
-      const rows = json.todo.registros || [];
-      const dataRows = rows.length > 1 ? rows.slice(1) : [];
-      S.registros = dataRows.map(r => {
-        if(!r||!r[0]) return null;
-        const fecha = limpiarFecha(r[0]);
-        if(!fecha || fecha.toLowerCase()==='fecha') return null;
-        return {
-          fecha,
-          hora:          limpiarHora(r[1]),
-          horaFin:       limpiarHora(r[2]),
-          area:          String(r[3]||''),
-          responsable:   String(r[4]||''),
-          lotes:         String(r[5]||''),
-          tipo:          String(r[6]||''),
-          contratista:   String(r[7]||''),
-          actividad:     String(r[8]||''),
-          tarea:         String(r[9]||''),
-          nPersonas:     parseInt(r[10])||0,
-          obs:           String(r[11]||''),
-          registradoPor: String(r[12]||'')
-        };
-      }).filter(Boolean);
-
-      // ── Maestros (si vienen datos los fusiona con local) ──
-      const m = json.todo;
-      if(m.areas?.length > 1)        DB.maestros.areas        = rowsToMaestro('areas',        m.areas.slice(1));
-      if(m.responsables?.length > 1) DB.maestros.responsables = rowsToMaestro('responsables', m.responsables.slice(1));
-      if(m.cultivos?.length > 1)     DB.maestros.cultivos     = rowsToMaestro('cultivos',     m.cultivos.slice(1));
-      if(m.actividades?.length > 1)  DB.maestros.actividades  = rowsToMaestro('actividades',  m.actividades.slice(1));
-      if(m.contratas?.length > 1)    DB.maestros.contratas    = rowsToMaestro('contratas',    m.contratas.slice(1));
-      save();
-
-    } else if(json.status === 'error'){
-      throw new Error(json.message||'Error del servidor');
+    const { registros, maestros } = await window.AgroPlanner.SheetsService.cargarTodo(CFG.APPS_SCRIPT_URL);
+    S.registros = registros;
+    // Aplicar maestros recibidos
+    const tipos = ['areas','responsables','cultivos','actividades','contratas'];
+    for(const tipo of tipos){
+      if(maestros[tipo]) DB.maestros[tipo] = rowsToMaestro(tipo, maestros[tipo]);
     }
-
+    save();
     sync('ok','en línea');
     renderInicio();
     renderReportes();
-    initForm(); // refrescar selects con maestros actualizados
+    initForm();
   }catch(e){
-    // Fallback: intentar gviz si el Apps Script falla
-    console.warn('Apps Script falló, intentando gviz:',e.message);
+    console.warn('Apps Script falló, intentando gviz:', e.message);
     try{
       await cargarRegistrosGviz();
     }catch(e2){
-      console.error('Error cargando datos:',e2);
+      console.error('Error cargando datos:', e2);
       sync('err','error de carga');
       toast('No se pudo cargar: '+e.message,'err');
     }
   }
 }
 
+// cargarRegistrosGviz — delegada a SheetsService (fallback cuando Apps Script falla)
 async function cargarRegistrosGviz(){
-  const url=`https://docs.google.com/spreadsheets/d/${CFG.SHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(CFG.SHEET_NAME)}`;
-  const res=await fetch(url);
-  if(!res.ok)throw new Error('HTTP '+res.status);
-  const text=await res.text();
-  const match=text.match(/google\.visualization\.Query\.setResponse\(([\s\S]*)\)/);
-  if(!match)throw new Error('Formato gviz inválido');
-  const json=JSON.parse(match[1]);
-  const rows=json.table?.rows||[];
-  let dataRows=rows;
-  if(rows.length>0){
-    const primerVal=rows[0]?.c?.[0]?.v;
-    if(primerVal===null||primerVal===undefined){dataRows=rows.slice(1);}
-    else{const s=String(primerVal);if(!s.startsWith('Date(')&&isNaN(Number(s))&&!/^\d{4}-\d{2}-\d{2}/.test(s)){dataRows=rows.slice(1);}}
-  }
-  S.registros=dataRows.map(r=>{
-    if(!r?.c)return null;
-    const fecha=parseGoogleFecha(r.c[0]?.v);
-    if(!fecha)return null;
-    return{fecha,hora:parseGoogleHora(r.c[1]?.v),area:String(r.c[2]?.v||''),responsable:String(r.c[3]?.v||''),lotes:String(r.c[4]?.v||''),tipo:String(r.c[5]?.v||''),actividad:String(r.c[6]?.v||''),nPersonas:parseInt(r.c[7]?.v)||0,obs:String(r.c[8]?.v||''),registradoPor:String(r.c[9]?.v||'')};
-  }).filter(Boolean);
+  S.registros = await window.AgroPlanner.SheetsService.cargarGviz(CFG.SHEET_ID, CFG.SHEET_NAME);
   sync('ok','en línea (gviz)');
-  renderInicio();renderReportes();
+  renderInicio();
+  renderReportes();
 }
 
 /* ═══════════ REPORTES ═══════════ */
@@ -4926,7 +4766,7 @@ async function guardarUser(){ /* PARCHE-5: async para hash SHA-256 */
     exportar:rol==='admin'||document.getElementById('p-exportar').checked,
   };
   /* PARCHE-5: hashear contraseña con SHA-256 antes de guardar */
-  const hashedPass = await _hashPassword(pass);
+  const hashedPass = await window.AgroPlanner.storage.hashPassword(pass);
   if(S.editUserId){
     const u=DB.usuarios.find(x=>x.id===S.editUserId);
     u.nombre=nombre;u.usuario=usuario;u.password=hashedPass;u.rol=rol;u.estado=estado;u.perms=perms;
@@ -4983,76 +4823,29 @@ function iniciarApp(){
 
 /* script temporal para pruebas */
 
-/* ═══════════════════════════════════════════════════════
-   PARCHE-5: helpers de contraseña con SHA-256 (Web Crypto API)
-   Prefijo _ indica uso interno. No llamar directamente desde UI.
-═══════════════════════════════════════════════════════ */
-
-/** Genera hash SHA-256 de una contraseña en texto plano. @returns {Promise<string>} */
-async function _hashPassword(plain){
-  const enc = new TextEncoder();
-  const buf = await crypto.subtle.digest('SHA-256', enc.encode(plain));
-  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
-}
-
-/**
- * Verifica una contraseña contra un hash SHA-256 almacenado.
- * Incluye compatibilidad legacy: si el almacenado tiene menos de 64 chars
- * (texto plano anterior a este parche), compara directamente.
- * Este fallback se elimina en Fase 6 de la migración.
- * @returns {Promise<boolean>}
- */
-async function _verifyPassword(plain, stored){
-  if(!plain || !stored) return false;
-  if(stored.length < 64) return plain === stored; /* legado: texto plano */
-  const hash = await _hashPassword(plain);
-  return hash === stored;
-}
-
-/**
- * Migra contraseñas en texto plano a hash SHA-256.
- * Se ejecuta una vez por sesión al cargar la app.
- * No es destructiva: solo modifica entradas cuya contraseña sea texto plano (< 64 chars).
- */
-async function _migrarPasswordsLegacy(){
-  let changed = false;
-  for(const u of DB.usuarios){
-    if(u.password && u.password.length < 64){
-      u.password = await _hashPassword(u.password);
-      changed = true;
-    }
-  }
-  if(changed){ save(); }
-}
+/* _hashPassword, _verifyPassword, _migrarPasswordsLegacy → movidas a AuthService + storage.service.js */
 
 /* Login activo — sin bypass */
 window.onload = async function() {
-  /* PARCHE-5: migrar contraseñas legado a hash SHA-256 antes de cualquier verificación */
-  await _migrarPasswordsLegacy();
-  const saved = sessionStorage.getItem('agro_session');
-  if(saved){
-    try{
-      const sess = JSON.parse(saved);
-      const found = DB.usuarios.find(u=>u.id===sess.id&&u.usuario===sess.usuario&&(u.estado||'Activo')==='Activo');
-      if(found){
-        S.usuario = found;
-        document.getElementById('login-screen').style.display='none';
-        document.getElementById('app').style.display='flex';
-        document.getElementById('topbar-date').textContent=fechaLarga();
-        document.getElementById('topbar-name').textContent=found.nombre;
-        document.getElementById('topbar-role').textContent=found.rol;
-        document.getElementById('topbar-av').textContent=initials(found.nombre);
-        aplicarPermisos(found);
-        iniciarApp();
-        initMobUI();
-        setTimeout(()=>VE.init(), 300);
-        return;
-      }
-    }catch(e){}
+  // Migrar passwords legacy a SHA-256 (se ejecuta una vez, no destructivo)
+  const migrated = await window.AgroPlanner.AuthService.migratePasswords(DB.usuarios);
+  if(migrated) save();
+
+  // Intentar restaurar sesión activa
+  const restored = window.AgroPlanner.AuthService.restoreSession(DB.usuarios);
+  if(restored){
+    S.usuario = restored.usuario;
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('app').style.display = 'flex';
+    window.AgroPlanner.AuthService.applyPermissions(restored.usuario);
+    iniciarApp();
+    initMobUI();
+    setTimeout(()=>VE.init(), 300);
+    return;
   }
   // Sin sesión activa → mostrar login
-  document.getElementById('login-screen').style.display='flex';
-  document.getElementById('app').style.display='none';
+  document.getElementById('login-screen').style.display = 'flex';
+  document.getElementById('app').style.display = 'none';
 };
 
 
@@ -5599,19 +5392,13 @@ async function descargarPDF(){
 
 
 async function reemplazarRegistrosEnSheets(){
-  const ctrl = new AbortController();
-  const tid = setTimeout(()=>ctrl.abort(), 20000);
+  // Reemplaza toda la hoja de Registros con los datos en memoria
+  const headers = ['Fecha','Hora Inicio','Hora Término','Área','Responsable','Lote(s)','Tipo Personal','Contratista','Actividad','Tarea/Meta','N° Personas','Observaciones','Registrado por','Timestamp'];
+  const rows = S.registros.map(r=>[r.fecha,r.hora,r.horaFin||'',r.area,r.responsable,r.lotes||'',r.tipo,r.contratista||'',r.actividad,r.tarea||'',r.nPersonas,r.obs||'',r.registradoPor||'',r.timestamp||'']);
   try{
-    const headers = ['Fecha','Hora Inicio','Hora Término','Área','Responsable','Lote(s)','Tipo Personal','Contratista','Actividad','Tarea/Meta','N° Personas','Observaciones','Registrado por','Timestamp'];
-    const filas = S.registros.map(r=>[r.fecha,r.hora,r.horaFin||'',r.area,r.responsable,r.lotes||'',r.tipo,r.contratista||'',r.actividad,r.tarea||'',r.nPersonas,r.obs||'',r.registradoPor||'',r.timestamp||'']);
-    const body = JSON.stringify({accion:'reemplazar',sheet:'Registros',datos:[headers,...filas]});
-    const res = await fetch(CFG.APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body,signal:ctrl.signal});
-    clearTimeout(tid);
-    if(!res.ok) throw new Error('HTTP '+res.status);
-    const json = await res.json();
-    if(json.status!=='ok') throw new Error(json.message||'Error');
+    await window.AgroPlanner.SheetsService.pushMaestro('registros_hoja', headers, rows, CFG.APPS_SCRIPT_URL);
     sync('ok','sincronizado');
-  }catch(e){clearTimeout(tid);sync('err','error');throw e;}
+  }catch(e){ sync('err','error'); throw e; }
 }
 
 </script>

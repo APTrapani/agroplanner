@@ -5,12 +5,7 @@
  *   módulos necesarios para la compatibilidad con el monolito durante
  *   la migración incremental.
  *
- *   FASE ACTUAL: Fase 1
- *   En esta fase, main.js solo inicializa los módulos de infraestructura
- *   (config, state, audit, storage, validators). El monolito sigue manejando
- *   toda la lógica de UI y negocio.
- *
- *   A partir de Fase 2, main.js tomará progresivamente el control del bootstrap.
+ *   FASE ACTUAL: Fase 2
  *
  * @dependencies
  *   - ./core/config.js
@@ -18,15 +13,14 @@
  *   - ./core/utils.js
  *   - ./audit/audit.service.js
  *   - ./services/storage.service.js
+ *   - ./services/auth.service.js
+ *   - ./services/sheets.service.js
  *   - ./validators/forms.validator.js
  *
  * @changelog
  *   - 2025-06-01 · Creación inicial (Fase 1)
+ *   - 2025-06-02 · Fase 2: añadidos AuthService y SheetsService
  */
-
-// ─────────────────────────────────────────────
-// Importaciones (en orden de dependencia)
-// ─────────────────────────────────────────────
 
 import { APP_CONFIG, MAESTROS_SHEETS, MAESTROS_HEADERS, PERMS_DEFAULT, DB_DEFAULT } from './core/config.js';
 import { isoHoy, horaAhora, fechaLarga, fechaCorta, initials, limpiarFecha, limpiarHora, parseGoogleFecha, parseGoogleHora, sanitizeHTML, debounce } from './core/utils.js';
@@ -34,58 +28,38 @@ import { storageGet, storageSet, storageRemove, hashPassword, verifyPassword } f
 import { StateManager } from './core/state.js';
 import { AuditService } from './audit/audit.service.js';
 import { validateRegistro, validateUsuario, validateResponsable, validateActividad, validateCultivo, validateContrata, validateArea } from './validators/forms.validator.js';
+import { AuthService }   from './services/auth.service.js';
+import { SheetsService } from './services/sheets.service.js';
 
 // ─────────────────────────────────────────────
 // Exposición global para compatibilidad con monolito
 // TODO Fase 6: eliminar toda esta sección
 // ─────────────────────────────────────────────
 
-/**
- * Durante la migración incremental, los módulos de Fase 1 se exponen en
- * window para que el monolito pueda consumirlos sin necesidad de ser
- * refactorizado en esta fase.
- *
- * El patrón es: window.AgroPlanner.NombreModulo
- * Para no contaminar el scope global con nombres genéricos.
- */
 window.AgroPlanner = {
-  // Core
-  config: { APP_CONFIG, MAESTROS_SHEETS, MAESTROS_HEADERS, PERMS_DEFAULT, DB_DEFAULT },
-  utils:  { isoHoy, horaAhora, fechaLarga, fechaCorta, initials, limpiarFecha, limpiarHora, parseGoogleFecha, parseGoogleHora, sanitizeHTML, debounce },
-
-  // Services
-  storage: { storageGet, storageSet, storageRemove, hashPassword, verifyPassword },
-
-  // State
+  config:   { APP_CONFIG, MAESTROS_SHEETS, MAESTROS_HEADERS, PERMS_DEFAULT, DB_DEFAULT },
+  utils:    { isoHoy, horaAhora, fechaLarga, fechaCorta, initials, limpiarFecha, limpiarHora, parseGoogleFecha, parseGoogleHora, sanitizeHTML, debounce },
+  storage:  { storageGet, storageSet, storageRemove, hashPassword, verifyPassword },
   StateManager,
-
-  // Audit
   AuditService,
-
-  // Validators
+  AuthService,
+  SheetsService,
   validators: { validateRegistro, validateUsuario, validateResponsable, validateActividad, validateCultivo, validateContrata, validateArea },
 };
 
 // ─────────────────────────────────────────────
-// Bootstrap de Fase 1
+// Bootstrap
 // ─────────────────────────────────────────────
 
-/**
- * Inicialización mínima para Fase 1.
- * En fases posteriores, esta función orquestará el arranque completo.
- */
 function bootstrap() {
-  // Registrar inicio de sesión del módulo en auditoría
   AuditService.log('system.modules.loaded', {
-    phase: 1,
-    modules: ['config', 'utils', 'storage.service', 'state', 'audit.service', 'forms.validator'],
+    phase: 2,
+    modules: ['config', 'utils', 'storage.service', 'state', 'audit.service', 'auth.service', 'sheets.service', 'forms.validator'],
   });
-
-  console.info('[AgroPlanner] Módulos de Fase 1 cargados correctamente.');
+  console.info('[AgroPlanner] Módulos de Fase 2 cargados correctamente.');
   console.info('[AgroPlanner] Acceso vía window.AgroPlanner.* disponible para compatibilidad.');
 }
 
-// Ejecutar bootstrap cuando el DOM esté listo
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', bootstrap);
 } else {

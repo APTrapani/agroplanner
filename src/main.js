@@ -7,6 +7,7 @@
  *   - 2025-06-02 · Fase 2: AuthService y SheetsService
  *   - 2025-06-02 · Fase 3: Toast, SearchableSelect, MultiSelect
  *   - 2025-06-02 · Fase 4: Dashboard y Reportes
+ *   - 2025-06-02 · Fase 5: módulos de configuración
  */
 
 import { APP_CONFIG, MAESTROS_SHEETS, MAESTROS_HEADERS, PERMS_DEFAULT, DB_DEFAULT } from './core/config.js';
@@ -22,6 +23,12 @@ import { ssLoad, ssGetValue, ssReset, ssOpen, ssBlur, ssCloseOne, ssCloseAll, ss
 import { ssmLoad, ssmOpen, ssmClose, ssmFilter, ssmRender, ssmToggle, ssmToggleAll, ssmUpdateTags, ssmGetSelected, ssmReset, ssmGetCount, ssmSetSelected } from './ui/components/multi-select.js';
 import { Dashboard } from './ui/pages/dashboard.js';
 import { Reportes }  from './ui/pages/reportes.js';
+import { Areas }         from './ui/pages/config/areas.js';
+import { Actividades }   from './ui/pages/config/actividades.js';
+import { Cultivos }      from './ui/pages/config/cultivos.js';
+import { Responsables }  from './ui/pages/config/responsables.js';
+import { Contratas }     from './ui/pages/config/contratas.js';
+import { Usuarios }      from './ui/pages/config/usuarios.js';
 
 // ─────────────────────────────────────────────
 // Exposición global para compatibilidad con monolito
@@ -41,6 +48,13 @@ window.AgroPlanner = {
   SSM:        { ssmLoad, ssmOpen, ssmClose, ssmFilter, ssmRender, ssmToggle, ssmToggleAll, ssmUpdateTags, ssmGetSelected, ssmReset, ssmGetCount, ssmSetSelected },
   Dashboard,
   Reportes,
+  // Config
+  Areas,
+  Actividades,
+  Cultivos,
+  Responsables,
+  Contratas,
+  Usuarios,
   validators: { validateRegistro, validateUsuario, validateResponsable, validateActividad, validateCultivo, validateContrata, validateArea },
 };
 
@@ -50,12 +64,14 @@ window.AgroPlanner = {
 
 function bootstrap() {
   AuditService.log('system.modules.loaded', {
-    phase: 4,
+    phase: 5,
     modules: ['config','utils','storage.service','state','audit.service',
               'auth.service','sheets.service','toast','searchable-select',
-              'multi-select','dashboard','reportes','forms.validator'],
+              'multi-select','dashboard','reportes',
+              'areas','actividades','cultivos','responsables','contratas','usuarios',
+              'forms.validator'],
   });
-  console.info('[AgroPlanner] Módulos de Fase 4 cargados correctamente.');
+  console.info('[AgroPlanner] Módulos de Fase 5 cargados correctamente.');
   console.info('[AgroPlanner] Acceso vía window.AgroPlanner.* disponible para compatibilidad.');
 
   // Notificar al monolito que los módulos están listos
@@ -63,8 +79,6 @@ function bootstrap() {
   document.dispatchEvent(new CustomEvent('agroplanner:ready'));
 }
 
-// Señal de que window.AgroPlanner está listo
-// El monolito escucha este evento para re-ejecutar renders pendientes
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', bootstrap);
 } else {

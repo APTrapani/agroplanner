@@ -1629,7 +1629,9 @@ function toggleFiltros(){
   chev.style.transform=open?'rotate(180deg)':'rotate(0deg)';
 }
 
-function initFiltrosDash(){
+// initFiltrosDash — delegada a Dashboard (Fase 4)
+function initFiltrosDash(){ _whenReady(() => window.AgroPlanner.Dashboard.initFiltros()); }
+function _initFiltrosDashOriginal(){
   // Fechas: hoy por defecto en ambos campos
   const fd=document.getElementById('fil-dash-desde');
   const fh=document.getElementById('fil-dash-hasta');
@@ -1643,7 +1645,9 @@ function initFiltrosDash(){
   }
 }
 
-function getSegFiltro(){
+// getSegFiltro — delegada a Dashboard (Fase 4)
+function getSegFiltro(){ return window._agroModulosListos ? window.AgroPlanner.Dashboard.getSegFiltro() : (()=>true); }
+function _getSegFiltroOriginal(){
   const hoy=isoHoy();
   const desde=(document.getElementById('fil-dash-desde')?.value)||hoy;
   const hasta=(document.getElementById('fil-dash-hasta')?.value)||hoy;
@@ -1656,7 +1660,27 @@ function getSegFiltro(){
 }
 
 /* ═══════════ INICIO / DASHBOARD ═══════════ */
+/* ═══════════════════════════════════════════════════════
+   FASE 4: Bridges hacia módulos Dashboard y Reportes
+   Las funciones esperan a window.AgroPlanner si aún no está listo
+   (los módulos ES se cargan en paralelo con el script inline)
+═══════════════════════════════════════════════════════ */
+function _whenReady(fn) {
+  if (window._agroModulosListos) { fn(); return; }
+  document.addEventListener('agroplanner:ready', fn, { once: true });
+}
+
+// renderInicio — delegada a Dashboard (Fase 4)
 function renderInicio(){
+  _whenReady(() => {
+    window.AgroPlanner.Dashboard.render();
+    // Segundo render con doble rAF para que los contenedores SVG tengan ancho real
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      window.AgroPlanner.Dashboard.render();
+    }));
+  });
+}
+function _renderInicioOriginal(){
   document.getElementById('inicio-fecha').textContent=fechaLarga();
   initFiltrosDash();
   const filtro=getSegFiltro();
@@ -1781,7 +1805,9 @@ function renderInicio(){
   // Tabla últimos registros
 }
 
-function animCount(id, target){
+// animCount — delegada a Dashboard (Fase 4)
+function animCount(id,target){ window.AgroPlanner.Dashboard.animCount(id,target); }
+function _animCountOriginal(id, target){
   const el=document.getElementById(id);
   if(!el) return;
   // Cancelar animación previa si existe (evita stacking de intervalos en re-renders)
@@ -1796,7 +1822,9 @@ function animCount(id, target){
   }, dur/steps);
 }
 
-function renderDonut(propio, contrata, total){
+// renderDonut — delegada a Dashboard (Fase 4)
+function renderDonut(p,c,t){ window.AgroPlanner.Dashboard.renderDonut(p,c,t); }
+function _renderDonutOriginal(propio, contrata, total){
   const svg=document.getElementById('donut-svg');
   const legend=document.getElementById('donut-legend');
   if(!svg||!legend) return;
@@ -1846,7 +1874,9 @@ function renderDonut(propio, contrata, total){
     </div>`;
 }
 
-function renderBars(id, obj, grads, limit=999, desglose=null){
+// renderBars — delegada a Dashboard (Fase 4)
+function renderBars(i,o,g,l=999,d=null){ window.AgroPlanner.Dashboard.renderBars(i,o,g,l,d); }
+function _renderBarsOriginal(id, obj, grads, limit=999, desglose=null){
   const el = document.getElementById(id);
   if(!el) return;
   const en = Object.entries(obj).sort((a,b)=>b[1]-a[1]).slice(0,limit);
@@ -2484,7 +2514,9 @@ async function cargarRegistrosGviz(){
 }
 
 /* ═══════════ REPORTES ═══════════ */
-function renderReportes(){
+// renderReportes — delegada a Reportes (Fase 4)
+function renderReportes(){ _whenReady(() => window.AgroPlanner.Reportes.render()); }
+function _renderReportesOriginal(){
   const regs=filtrar();
   document.getElementById('rep-cnt').textContent=regs.length+' registro'+(regs.length!==1?'s':', ')+' · '+regs.reduce((s,r)=>s+r.nPersonas,0)+' personas';
   pFil('fil-fecha',[...new Set(S.registros.map(r=>r.fecha))].sort().reverse(),'Todas las fechas');
@@ -2526,7 +2558,9 @@ function renderReportes(){
   if(selCnt)selCnt.textContent=regSeleccionados.size;
 }
 
-function filtrar(){
+// filtrar — delegada a Reportes (Fase 4)
+function filtrar(){ return window._agroModulosListos ? window.AgroPlanner.Reportes.filtrar() : []; }
+function _filtrarOriginal(){
   const fecha=document.getElementById('fil-fecha').value;
   const area=document.getElementById('fil-area').value;
   const tipo=document.getElementById('fil-tipo').value;
@@ -2537,7 +2571,9 @@ function filtrar(){
 }
 
 /* ═══════════ EXPORTAR EXCEL ═══════════ */
-function exportarExcel(){
+// exportarExcel — delegada a Reportes (Fase 4)
+function exportarExcel(){ _whenReady(() => window.AgroPlanner.Reportes.exportarExcel()); }
+function _exportarExcelOriginal(){
   const perms=S.usuario?.perms||{};
   const isAdmin=S.usuario?.rol==='admin';
   if(!isAdmin&&!perms.exportar){toast('No tienes permiso para exportar','err');return;}
@@ -3158,7 +3194,9 @@ function importarCultivos(input){
 
 
 /* ── HELPER SHARED: barras horizontales apiladas en 2 columnas internas ── */
-function renderDualColBars(containerId, entries, allContratas, maxVal, CONTRATA_COLORS){
+// renderDualColBars — delegada a Dashboard (Fase 4)
+function renderDualColBars(a,b,c,d,e){ window.AgroPlanner.Dashboard.renderDualColBars(a,b,c,d,e); }
+function _renderDualColBarsOriginal(containerId, entries, allContratas, maxVal, CONTRATA_COLORS){
   const el = document.getElementById(containerId);
   if(!el) return;
 
@@ -3246,7 +3284,9 @@ function renderDualColBars(containerId, entries, allContratas, maxVal, CONTRATA_
 }
 
 /* ── BARRAS RESPONSABLES ── */
-function renderBarsResp(byResp){
+// renderBarsResp — delegada a Dashboard (Fase 4)
+function renderBarsResp(b){ window.AgroPlanner.Dashboard.renderBarsResp(b); }
+function _renderBarsRespOriginal(byResp){
   const el = document.getElementById('bars-resp');
   if(!el) return;
 
@@ -3269,7 +3309,9 @@ function renderBarsResp(byResp){
 }
 
 /* ── COLUMNAS APILADAS: PERSONAS POR ACTIVIDAD ── */
-function renderStackedAct(byADesglose){
+// renderStackedAct — delegada a Dashboard (Fase 4)
+function renderStackedAct(b){ window.AgroPlanner.Dashboard.renderStackedAct(b); }
+function _renderStackedActOriginal(byADesglose){
   const entries = Object.entries(byADesglose)
     .map(([k,d])=>({ label:k, propio:d.propio||0, contratas:d.contratas||{}, total:(d.propio||0)+(d.contrata||0) }))
     .filter(e=>e.total>0).sort((a,b)=>b.total-a.total);
@@ -3368,7 +3410,9 @@ function renderAreaPie(byArea){
 }
 
 /* ── TABLA RESUMEN POR ACTIVIDAD ── */
-function renderResumen(regs){
+// renderResumen — delegada a Dashboard (Fase 4)
+function renderResumen(r){ window.AgroPlanner.Dashboard.renderResumen(r); }
+function _renderResumenOriginal(regs){
   const tbody = document.getElementById('tbody-resumen');
   if(!tbody) return;
   if(!regs.length){
@@ -3421,7 +3465,9 @@ function renderResumen(regs){
 }
 
 /* ── EVOLUCIÓN SEMANAL ── */
-function renderEvolucion(){
+// renderEvolucion — delegada a Dashboard (Fase 4)
+function renderEvolucion(){ window.AgroPlanner.Dashboard.renderEvolucion(); }
+function _renderEvolucionOriginal(){
   const svg = document.getElementById('evolucion-svg');
   if(!svg) return;
 

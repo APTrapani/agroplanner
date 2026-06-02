@@ -1,25 +1,11 @@
 /**
  * @module main
  * @description Punto de entrada de la aplicación AgroPlanner.
- *   Inicializa los módulos core en el orden correcto y expone los
- *   módulos necesarios para la compatibilidad con el monolito durante
- *   la migración incremental.
- *
- *   FASE ACTUAL: Fase 2
- *
- * @dependencies
- *   - ./core/config.js
- *   - ./core/state.js
- *   - ./core/utils.js
- *   - ./audit/audit.service.js
- *   - ./services/storage.service.js
- *   - ./services/auth.service.js
- *   - ./services/sheets.service.js
- *   - ./validators/forms.validator.js
  *
  * @changelog
  *   - 2025-06-01 · Creación inicial (Fase 1)
- *   - 2025-06-02 · Fase 2: añadidos AuthService y SheetsService
+ *   - 2025-06-02 · Fase 2: AuthService y SheetsService
+ *   - 2025-06-02 · Fase 3: Toast, SearchableSelect, MultiSelect
  */
 
 import { APP_CONFIG, MAESTROS_SHEETS, MAESTROS_HEADERS, PERMS_DEFAULT, DB_DEFAULT } from './core/config.js';
@@ -30,6 +16,16 @@ import { AuditService } from './audit/audit.service.js';
 import { validateRegistro, validateUsuario, validateResponsable, validateActividad, validateCultivo, validateContrata, validateArea } from './validators/forms.validator.js';
 import { AuthService }   from './services/auth.service.js';
 import { SheetsService } from './services/sheets.service.js';
+import { toast, sync }   from './ui/components/toast.js';
+import {
+  ssLoad, ssGetValue, ssReset, ssOpen, ssBlur, ssCloseOne, ssCloseAll,
+  ssInputFilter, ssFilter, ssRenderList, ssPick, ssClear,
+} from './ui/components/searchable-select.js';
+import {
+  ssmLoad, ssmOpen, ssmClose, ssmFilter, ssmRender,
+  ssmToggle, ssmToggleAll, ssmUpdateTags, ssmGetSelected,
+  ssmReset, ssmGetCount, ssmSetSelected,
+} from './ui/components/multi-select.js';
 
 // ─────────────────────────────────────────────
 // Exposición global para compatibilidad con monolito
@@ -44,6 +40,10 @@ window.AgroPlanner = {
   AuditService,
   AuthService,
   SheetsService,
+  // Fase 3: componentes UI
+  Toast:    { toast, sync },
+  SS:       { ssLoad, ssGetValue, ssReset, ssOpen, ssBlur, ssCloseOne, ssCloseAll, ssInputFilter, ssFilter, ssRenderList, ssPick, ssClear },
+  SSM:      { ssmLoad, ssmOpen, ssmClose, ssmFilter, ssmRender, ssmToggle, ssmToggleAll, ssmUpdateTags, ssmGetSelected, ssmReset, ssmGetCount, ssmSetSelected },
   validators: { validateRegistro, validateUsuario, validateResponsable, validateActividad, validateCultivo, validateContrata, validateArea },
 };
 
@@ -53,10 +53,12 @@ window.AgroPlanner = {
 
 function bootstrap() {
   AuditService.log('system.modules.loaded', {
-    phase: 2,
-    modules: ['config', 'utils', 'storage.service', 'state', 'audit.service', 'auth.service', 'sheets.service', 'forms.validator'],
+    phase: 3,
+    modules: ['config', 'utils', 'storage.service', 'state', 'audit.service',
+              'auth.service', 'sheets.service', 'toast', 'searchable-select', 'multi-select',
+              'forms.validator'],
   });
-  console.info('[AgroPlanner] Módulos de Fase 2 cargados correctamente.');
+  console.info('[AgroPlanner] Módulos de Fase 3 cargados correctamente.');
   console.info('[AgroPlanner] Acceso vía window.AgroPlanner.* disponible para compatibilidad.');
 }
 

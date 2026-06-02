@@ -1537,16 +1537,9 @@ function fechaCorta(iso){
   return`${d}/${m}/${y}`;
 }
 
-function toast(msg,t=''){
-  const el=document.getElementById('toast');
-  el.textContent=msg;el.className=t?`show ${t}`:'show';
-  clearTimeout(el._t);el._t=setTimeout(()=>el.className='',2800);
-}
-
-function sync(s,txt){
-  document.getElementById('sdot').className=`sdot ${s}`;
-  document.getElementById('stxt').textContent=txt;
-}
+// toast y sync — delegadas a Toast component (Fase 3)
+function toast(msg, t='') { window.AgroPlanner.Toast.toast(msg, t); }
+function sync(s, txt)     { window.AgroPlanner.Toast.sync(s, txt); }
 
 function pSel(id,lista){
   // Si existe un searchable select para este id, usarlo
@@ -1644,7 +1637,7 @@ function initFiltrosDash(){
   if(fd&&!fd.value) fd.value=hoy;
   if(fh&&!fh.value) fh.value=hoy;
   // Actividad: poblar ss solo si aún no tiene datos
-  if(!(SS_DATA['fil-dash-act']?.length)){
+  if(!document.querySelector('#ss-list-fil-dash-act .ss-opt')){
     const acts=(DB.maestros.actividades||[]).map(a=>typeof a==='string'?a:(a.actividad||'')).filter(Boolean);
     ssLoad('fil-dash-act', acts);
   }
@@ -1907,7 +1900,7 @@ function saveDraft(prefix){
   });
   // Guardar lotes seleccionados
   const ssmId = prefix==='f' ? 'lotes' : 'mf-lotes';
-  draft['_lotes'] = [...(SSM_SEL[ssmId]||new Set())];
+  draft['_lotes'] = window.AgroPlanner.SSM.ssmGetSelected(ssmId).split(', ').filter(Boolean).map(Number);
   // Guardar botones activos (tipo y turno)
   const tipoBtn = document.querySelector('#'+prefix+'-tipo-group .btn-toggle.active');
   draft['_tipo_active'] = tipoBtn?.dataset.val||'';
@@ -1951,8 +1944,7 @@ function loadDraft(prefix){
     // Restaurar lotes
     const ssmId = prefix==='f' ? 'lotes' : 'mf-lotes';
     if(draft['_lotes']?.length){
-      SSM_SEL[ssmId] = new Set(draft['_lotes']);
-      ssmUpdateTags(ssmId);
+      window.AgroPlanner.SSM.ssmSetSelected(ssmId, draft['_lotes']);
     }
     return true;
   }catch(e){ return false; }
@@ -1969,6 +1961,9 @@ function initForm(){
   pSel('f-resp', DB.maestros.responsables.map(r => typeof r === 'string' ? r : (r.nombreCorto || r.nombres)));
   pSel('f-act', DB.maestros.actividades.map(a => typeof a === 'string' ? a : (a.actividad || '')));
   ssLoad('f-contratista', (DB.maestros.contratas||[]).map(c=>typeof c==='string'?c:(c.nombreCorto||c.razon||'')).filter(Boolean));
+  // Fase 3: cargar lotes en el módulo SSM
+  ssmLoadLotes('lotes');
+  ssmLoadLotes('mf-lotes');
   S.lotes=[];initCascada();
   document.getElementById('reg-err').classList.remove('show');
   document.getElementById('reg-ok').classList.remove('show');
@@ -2215,7 +2210,7 @@ async function guardarRegistro(){
     [!np||np<=0,      'Ingresa el N° de personas (debe ser mayor a 0).'],
     [!hora,           'Selecciona la Hora de inicio.'],
     [!horaFin,        'Selecciona la Hora de término.'],
-    [!(SSM_SEL['lotes']?.size), 'Selecciona al menos un lote.'],
+    [!window.AgroPlanner.SSM.ssmGetCount('lotes'), 'Selecciona al menos un lote.'],
   ];
   const error = validaciones.find(([cond])=>cond);
   if(error){
@@ -3730,128 +3725,27 @@ function applySidebarState(){
 }
 
 /* ── SEARCHABLE SELECT ENGINE ── */
-const SS_DATA = {}; // { id: [opciones] }
+// SS engine — delegado a SearchableSelect (Fase 3)
+// Las funciones siguen disponibles globalmente para los atributos oninput/onfocus/onblur del HTML
+const SS_DATA = {}; // alias legacy — los datos viven en searchable-select.js
+function ssLoad(id, lista)            { window.AgroPlanner.SS.ssLoad(id, lista); }
+function ssReset(id)                  { window.AgroPlanner.SS.ssReset(id); }
+function ssOpen(id)                   { window.AgroPlanner.SS.ssOpen(id); }
+function ssBlur(id)                   { window.AgroPlanner.SS.ssBlur(id); }
+function ssCloseOne(id)               { window.AgroPlanner.SS.ssCloseOne(id); }
+function ssCloseAll()                 { window.AgroPlanner.SS.ssCloseAll(); }
+function ssInputFilter(id, q)         { window.AgroPlanner.SS.ssInputFilter(id, q); }
+function ssFilter(id, q)              { window.AgroPlanner.SS.ssFilter(id, q); }
+function ssRenderList(id, q)          { window.AgroPlanner.SS.ssRenderList(id, q); }
+function ssPick(id, val)              { window.AgroPlanner.SS.ssPick(id, val, _ssOnPick); }
+function ssClear(id)                  { window.AgroPlanner.SS.ssClear(id, _ssOnPick); }
 
-function ssLoad(id, lista){
-  SS_DATA[id] = lista;
-}
-
-function ssReset(id){
-  const inp  = document.getElementById('ss-'+id);
-  const hid  = document.getElementById(id);
-  const wrap = document.getElementById('ss-wrap-'+id);
-  if(inp){ inp.value=''; inp.placeholder='--Todos--'; }
-  if(hid) hid.value='';
-  wrap?.classList.remove('ss-open','ss-has-value');
-  document.getElementById('ss-drop-'+id)?.classList.remove('open');
-}
-
-function ssOpen(id){
-  const drop = document.getElementById('ss-drop-'+id);
-  const wrap = document.getElementById('ss-wrap-'+id);
-  const inp  = document.getElementById('ss-'+id);
-  if(!drop) return;
-  ssCloseAll();
-  drop.classList.add('open');
-  wrap?.classList.add('ss-open');
-  const hid = document.getElementById(id);
-  if(inp){
-    inp._prevVal = hid?.value || '';
-    inp.value = '';
-    inp.placeholder = 'Buscar…';
-  }
-  ssRenderList(id, '');
-}
-
-function ssBlur(id){
-  setTimeout(()=>{
-    const drop = document.getElementById('ss-drop-'+id);
-    if(drop?.classList.contains('open')) ssCloseOne(id);
-  }, 200);
-}
-
-function ssCloseOne(id){
-  const wrap = document.getElementById('ss-wrap-'+id);
-  const drop = document.getElementById('ss-drop-'+id);
-  const inp  = document.getElementById('ss-'+id);
-  const hid  = document.getElementById(id);
-  drop?.classList.remove('open');
-  wrap?.classList.remove('ss-open');
-  if(inp){ inp.value = hid?.value||''; inp.placeholder='--Todos--'; }
-}
-
-function ssCloseAll(){
-  document.querySelectorAll('.ss-wrap.ss-open').forEach(w=>{
-    const id = w.id?.replace('ss-wrap-','');
-    if(id) ssCloseOne(id);
-  });
-}
-
-function ssInputFilter(id, q){
-  const wrap = document.getElementById('ss-wrap-'+id);
-  if(!wrap?.classList.contains('ss-open')) ssOpen(id);
-  ssRenderList(id, q.toLowerCase().trim());
-}
-
-function ssFilter(id, q){
-  ssRenderList(id, q.toLowerCase().trim());
-}
-
-function ssRenderList(id, q){
-  const list = document.getElementById('ss-list-'+id);
-  if(!list) return;
-  const data = SS_DATA[id] || [];
-  const filtered = q ? data.filter(o=>o.toLowerCase().includes(q)) : data;
-  const cur = document.getElementById(id)?.value;
-  const todasLabel = id==='fil-dash-act' ? 'Todas las actividades' : '--Todos--';
-
-  // Construir usando DOM real para evitar XSS en valores con caracteres especiales
-  list.innerHTML = '';
-
-  if(!q){
-    const div = document.createElement('div');
-    div.className = 'ss-opt' + (!cur ? ' selected' : '');
-    div.textContent = todasLabel;
-    div.addEventListener('mousedown', ()=>ssPick(id,''));
-    list.appendChild(div);
-  }
-
-  if(!filtered.length && q){
-    const div = document.createElement('div');
-    div.className = 'ss-empty';
-    div.textContent = 'Sin resultados';
-    list.appendChild(div);
-    return;
-  }
-
-  filtered.forEach(o=>{
-    const div = document.createElement('div');
-    div.className = 'ss-opt' + (cur===o ? ' selected' : '');
-    div.textContent = o;
-    div.addEventListener('mousedown', ()=>ssPick(id, o));
-    list.appendChild(div);
-  });
-}
-
-function ssPick(id, val){
-  const inp  = document.getElementById('ss-'+id);
-  const hid  = document.getElementById(id);
-  const wrap = document.getElementById('ss-wrap-'+id);
-  if(inp){ inp.value=val; inp.placeholder='--Todos--'; }
-  if(hid) hid.value = val;
-  wrap?.classList.remove('ss-open');
-  wrap?.classList.toggle('ss-has-value', !!val);
-  document.getElementById('ss-drop-'+id)?.classList.remove('open');
-  if(id==='fil-dash-act') renderInicio();
-  // Autosave draft si es campo de formulario
-  if(id.startsWith('f-')&&!id.startsWith('f-hora')&&!id.startsWith('fil-')) saveDraft('f');
+// Callback de negocio post-selección (lógica extraída del componente)
+function _ssOnPick(id, val){
+  if(id === 'fil-dash-act') renderInicio();
+  if(id.startsWith('f-') && !id.startsWith('f-hora') && !id.startsWith('fil-')) saveDraft('f');
   if(id.startsWith('mf-')) saveDraft('mf');
 }
-
-function ssClear(id){
-  ssPick(id,'');
-}
-
 
 
 /* ── TIPO DE PERSONAL — botones ── */
@@ -3885,174 +3779,33 @@ function setTurno(val, prefix){
   }
 }
 
-/* ── SSM — MULTISELECT ENGINE (Lotes) ── */
-// SSM_SEL: { id: Set of selected values }
-const SSM_SEL = {};
+/* ── SSM — MULTISELECT ENGINE (Lotes) — delegado a MultiSelect (Fase 3) ── */
+const SSM_SEL = {}; // alias legacy — el estado vive en multi-select.js
 
-function ssmGetLotes(id){
-  // Retorna todos los lotes del sistema como array de objetos
-  return getGruposModulo().flatMap(g=>g.lotes);
+function ssmGetLotes(id){ return getGruposModulo().flatMap(g=>g.lotes); }
+function ssmOpen(id)                    { window.AgroPlanner.SSM.ssmOpen(id); }
+function ssmBlur(id)                    { /* no-op: cierre manejado por clic fuera */ }
+function ssmClose(id)                   { window.AgroPlanner.SSM.ssmClose(id); }
+function ssmFilter(id, q)               { window.AgroPlanner.SSM.ssmFilter(id, q); }
+function ssmRender(id, q)               { window.AgroPlanner.SSM.ssmRender(id, q); }
+function ssmToggle(id, n, event)        { window.AgroPlanner.SSM.ssmToggle(id, n, event, _ssmOnToggle); }
+function ssmToggleAll(id, event)        { window.AgroPlanner.SSM.ssmToggleAll(id, event); }
+function ssmUpdateTags(id)              { window.AgroPlanner.SSM.ssmUpdateTags(id); }
+function ssmGetSelected(id)             { return window.AgroPlanner.SSM.ssmGetSelected(id); }
+function ssmReset(id)                   { window.AgroPlanner.SSM.ssmReset(id); }
+function ssmGetCount(id)                { return window.AgroPlanner.SSM.ssmGetCount(id); }
+
+// Callback de negocio post-toggle
+function _ssmOnToggle(id){
+  if(id === 'lotes')    saveDraft('f');
+  if(id === 'mf-lotes') saveDraft('mf');
 }
 
-function ssmOpen(id){
-  const wrap = document.getElementById('ssm-wrap-'+id);
-  const inp  = document.getElementById('ssm-'+id+'-input');
-  if(!wrap) return;
-  // Cerrar otros dropdowns SS pero no ssm
-  ssCloseAll();
-  wrap.classList.add('ssm-open');
-  if(inp){ inp.value=''; inp.placeholder='Buscar…'; }
-  ssmRender(id, '');
-  // Focus permanece en el input principal
+// Cargar lotes en el módulo SSM cuando se inicializa el formulario
+function ssmLoadLotes(id){
+  window.AgroPlanner.SSM.ssmLoad(id, ssmGetLotes(id));
 }
 
-function ssmBlur(id){
-  // No cerrar — el dropdown se cierra solo con el botón "Listo" o clic fuera
-}
-
-// Cerrar ssm al hacer clic fuera (no dentro del dropdown)
-document.addEventListener('mousedown', function(e){
-  document.querySelectorAll('.ssm-wrap.ssm-open').forEach(wrap=>{
-    if(!wrap.contains(e.target)){
-      const id = wrap.id.replace('ssm-wrap-','');
-      ssmClose(id);
-    }
-  });
-}, true);
-
-function ssmClose(id){
-  const wrap = document.getElementById('ssm-wrap-'+id);
-  const inp  = document.getElementById('ssm-'+id+'-input');
-  wrap?.classList.remove('ssm-open');
-  if(inp){
-    const cnt = SSM_SEL[id]?.size || 0;
-    inp.value = '';
-    inp.placeholder = cnt===0 ? '--Todos--' : cnt+' lote'+(cnt>1?'s':'')+' seleccionado'+(cnt>1?'s':'');
-  }
-  ssmUpdateTags(id);
-  // Devolver foco al input para UX fluida
-  setTimeout(()=>inp?.blur(), 50);
-}
-
-function ssmFilter(id, q){
-  const wrap = document.getElementById('ssm-wrap-'+id);
-  if(!wrap?.classList.contains('ssm-open')) ssmOpen(id);
-  ssmRender(id, q.toLowerCase().trim());
-}
-
-function ssmRender(id, q){
-  const list  = document.getElementById('ssm-list-'+id);
-  if(!list) return;
-  if(!SSM_SEL[id]) SSM_SEL[id] = new Set();
-  const sel   = SSM_SEL[id];
-  const todos = ssmGetLotes(id);
-  const filtered = q ? todos.filter(l=>
-    String(l.n).includes(q) ||
-    (l.cult||'').toLowerCase().includes(q) ||
-    (l.modulo||'').toLowerCase().includes(q) ||
-    (l.etapa||'').toLowerCase().includes(q)
-  ) : todos;
-
-  // Actualizar "Seleccionar todos"
-  const allChk = document.getElementById('ssm-chk-all-'+id);
-  const badge  = document.getElementById('ssm-badge-'+id);
-  const allSel = filtered.length > 0 && filtered.every(l=>sel.has(l.n));
-  const someSel= filtered.some(l=>sel.has(l.n));
-  if(allChk){
-    allChk.style.background = allSel ? 'var(--green-bright)' : someSel ? 'var(--primary-bg)' : '';
-    allChk.style.borderColor = (allSel||someSel) ? 'var(--green-bright)' : '';
-    allChk.innerHTML = allSel
-      ? '<svg width="9" height="9" viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>'
-      : someSel ? '<svg width="8" height="2" viewBox="0 0 8 2"><line x1="0" y1="1" x2="8" y2="1" stroke="var(--green-dark)" stroke-width="2"/></svg>' : '';
-  }
-  if(badge) badge.textContent = sel.size ? sel.size+'/'+todos.length : todos.length+' lotes';
-
-  if(!filtered.length){
-    list.innerHTML = '<div class="ss-empty">Sin resultados</div>';
-    return;
-  }
-
-  list.innerHTML = filtered.map(l=>{
-    const isSel = sel.has(l.n);
-    const chk = isSel
-      ? '<svg width="9" height="9" viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>'
-      : '';
-    return `<div class="ssm-opt${isSel?' selected':''}" onmousedown="ssmToggle('${id}',${l.n})">
-      <span class="ssm-chk">${chk}</span>
-      <div class="ssm-opt-info">
-        <div class="ssm-opt-main">${l.n} &nbsp;<span style="font-weight:400;color:var(--text-muted)">${l.cult||''}</span></div>
-        <div class="ssm-opt-sub">${l.modulo||''} · ${l.etapa||''}</div>
-      </div>
-      ${l.ha ? `<span class="ssm-opt-ha">${parseFloat(l.ha).toFixed(2)} ha</span>` : ''}
-    </div>`;
-  }).join('');
-}
-
-function ssmToggle(id, n, event){
-  if(event) event.preventDefault();
-  if(!SSM_SEL[id]) SSM_SEL[id] = new Set();
-  const sel = SSM_SEL[id];
-  if(sel.has(n)) sel.delete(n); else sel.add(n);
-  const q = document.getElementById('ssm-search-'+id)?.value||'';
-  ssmRender(id, q.toLowerCase().trim());
-  ssmUpdateTags(id);
-  if(id==='lotes') saveDraft('f');
-  if(id==='mf-lotes') saveDraft('mf');
-}
-
-function ssmToggleAll(id, event){
-  if(event) event.preventDefault();
-  if(!SSM_SEL[id]) SSM_SEL[id] = new Set();
-  const sel = SSM_SEL[id];
-  const q   = (document.getElementById('ssm-search-'+id)?.value||'').toLowerCase().trim();
-  const todos= ssmGetLotes(id);
-  const filtered = q ? todos.filter(l=>String(l.n).includes(q)||(l.cult||'').toLowerCase().includes(q)||(l.modulo||'').toLowerCase().includes(q)) : todos;
-  const allSel = filtered.every(l=>sel.has(l.n));
-  if(allSel) filtered.forEach(l=>sel.delete(l.n));
-  else filtered.forEach(l=>sel.add(l.n));
-  ssmRender(id, q);
-  ssmUpdateTags(id);
-}
-
-function ssmUpdateTags(id){
-  const tagsId = id==='lotes' ? 'lotes-tags' : 'mob-lotes-tags';
-  const tags = document.getElementById(tagsId);
-  if(!tags) return;
-  const sel = SSM_SEL[id] || new Set();
-  const cnt = sel.size;
-  const inp = document.getElementById('ssm-'+id+'-input');
-  if(inp && !document.getElementById('ssm-wrap-'+id)?.classList.contains('ssm-open')){
-    inp.placeholder = cnt===0 ? '--Todos--' : cnt+' lote'+(cnt>1?'s':'')+' seleccionado'+(cnt>1?'s':'');
-  }
-  // Mostrar/ocultar botón Limpiar todo
-  const clearBtnId = id==='lotes' ? 'lotes-clear-btn' : 'mf-lotes-clear-btn';
-  const clearBtn = document.getElementById(clearBtnId);
-  if(clearBtn) clearBtn.style.display = cnt>0 ? '' : 'none';
-  if(cnt===0){ tags.innerHTML=''; return; }
-  const todos = ssmGetLotes(id);
-  const selArr = todos.filter(l=>sel.has(l.n));
-  // Tags individuales siempre
-  tags.innerHTML = selArr.map(l=>`<span style="display:inline-flex;align-items:center;gap:4px;background:var(--primary-bg);color:var(--green-dark);border:1px solid var(--primary-b);border-radius:6px;padding:2px 8px;font-size:11px;font-weight:600">${l.n}<button type="button" onmousedown="ssmToggle('${id}',${l.n},event)" style="background:none;border:none;cursor:pointer;color:var(--green-mid);padding:0;font-size:13px;line-height:1;display:flex">&times;</button></span>`).join(' ');
-}
-
-function ssmGetSelected(id){
-  // Retorna string con lotes seleccionados para guardar en registro
-  const sel = SSM_SEL[id] || new Set();
-  return [...sel].sort((a,b)=>a-b).join(', ');
-}
-
-function ssmReset(id){
-  SSM_SEL[id] = new Set();
-  const inp = document.getElementById('ssm-'+id+'-input');
-  if(inp){ inp.value=''; inp.placeholder='--Todos--'; }
-  document.getElementById('ssm-wrap-'+id)?.classList.remove('ssm-open');
-  const tagsId = id==='lotes' ? 'lotes-tags' : 'mob-lotes-tags';
-  const tags = document.getElementById(tagsId);
-  if(tags) tags.innerHTML='';
-  const clearBtnId = id==='lotes' ? 'lotes-clear-btn' : 'mf-lotes-clear-btn';
-  const clearBtn = document.getElementById(clearBtnId);
-  if(clearBtn) clearBtn.style.display='none';
-}
 
 /* ── TOGGLE CONTRATISTA ── */
 function toggleContratista(tipo_val){
@@ -5123,7 +4876,7 @@ async function guardarRegistroMob(){
     [!np||np<=0,      'Ingresa el N° de personas.'],
     [!hora,           'Selecciona la Hora de inicio.'],
     [!horaFin,        'Selecciona la Hora de término.'],
-    [!(SSM_SEL['mf-lotes']?.size), 'Selecciona al menos un lote.'],
+    [!window.AgroPlanner.SSM.ssmGetCount('mf-lotes'), 'Selecciona al menos un lote.'],
   ];
   const errMob = valMob.find(([cond])=>cond);
   if(errMob){

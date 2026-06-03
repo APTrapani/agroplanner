@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>AgroPlanner | Trapani   </title>
 <link rel="shortcut icon" href="https://fgftrapani.com/hubfs/trapani-logo-favicon.png">
+<title>AgroPlanner | Trapani   </title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Poppins:wght@400;500;600;700;800&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -727,7 +727,7 @@ tr.reg-selected td{background:rgba(74,153,96,.06)!important}
             <svg id="filtros-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;color:var(--text-label);transition:transform .2s"><polyline points="6 9 12 15 18 9"/></svg>
           </button>
           <div id="filtros-body" style="display:none;padding:.75rem 1.25rem 1rem;border-top:1px solid var(--border-base)">
-            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem;align-items:end">
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:1rem;align-items:end">
               <div class="field" style="margin-bottom:0">
                 <label>Fecha desde</label>
                 <input type="date" id="fil-dash-desde" onchange="renderInicio()" style="width:100%;padding:8px 10px;background:var(--bg-input);border:1px solid var(--border-hover);border-radius:var(--r);font-size:12px;font-family:var(--font);color:var(--text-main);outline:none">
@@ -737,9 +737,21 @@ tr.reg-selected td{background:rgba(74,153,96,.06)!important}
                 <input type="date" id="fil-dash-hasta" onchange="renderInicio()" style="width:100%;padding:8px 10px;background:var(--bg-input);border:1px solid var(--border-hover);border-radius:var(--r);font-size:12px;font-family:var(--font);color:var(--text-main);outline:none">
               </div>
               <div class="field" style="margin-bottom:0">
+                <label>Área</label>
+                <div class="ss-wrap" id="ss-wrap-fil-dash-area">
+                  <input class="ss-input" id="ss-fil-dash-area" placeholder="--Todas--" autocomplete="off" oninput="ssInputFilter('fil-dash-area',this.value)" onfocus="ssOpen('fil-dash-area')" onblur="ssBlur('fil-dash-area')">
+                  <div class="ss-icons"><button type="button" class="ss-clear" id="ss-clr-fil-dash-area" onclick="ssClear('fil-dash-area')" tabindex="-1">&#x2715;</button><svg class="ss-arrow" id="ss-arr-fil-dash-area" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px"><polyline points="6 9 12 15 18 9"/></svg></div>
+                  <div class="ss-drop" id="ss-drop-fil-dash-area">
+                    <input class="ss-search" placeholder="Buscar área…" oninput="ssFilter('fil-dash-area',this.value)" id="ss-search-fil-dash-area">
+                    <div class="ss-list" id="ss-list-fil-dash-area"></div>
+                  </div>
+                </div>
+                <input type="hidden" id="fil-dash-area">
+              </div>
+              <div class="field" style="margin-bottom:0">
                 <label>Actividad</label>
                 <div class="ss-wrap" id="ss-wrap-fil-dash-act">
-                  <input class="ss-input" id="ss-fil-dash-act" placeholder="--Todos--" data-placeholder="Todas las actividades…" autocomplete="off" oninput="ssInputFilter('fil-dash-act',this.value)" onfocus="ssOpen('fil-dash-act')" onblur="ssBlur('fil-dash-act')">
+                  <input class="ss-input" id="ss-fil-dash-act" placeholder="--Todas--" data-placeholder="Todas las actividades…" autocomplete="off" oninput="ssInputFilter('fil-dash-act',this.value)" onfocus="ssOpen('fil-dash-act')" onblur="ssBlur('fil-dash-act')">
                   <div class="ss-icons"><button type="button" class="ss-clear" id="ss-clr-fil-dash-act" onclick="ssClear('fil-dash-act')" tabindex="-1">&#x2715;</button><svg class="ss-arrow" id="ss-arr-fil-dash-act" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px"><polyline points="6 9 12 15 18 9"/></svg></div>
                   <div class="ss-drop" id="ss-drop-fil-dash-act">
                     <input class="ss-search" placeholder="Buscar actividad…" oninput="ssFilter('fil-dash-act',this.value)" id="ss-search-fil-dash-act">
@@ -3228,7 +3240,7 @@ function ssClear(id)                  { window.AgroPlanner.SS.ssClear(id, _ssOnP
 
 // Callback de negocio post-selección (lógica extraída del componente)
 function _ssOnPick(id, val){
-  if(id === 'fil-dash-act') renderInicio();
+  if(id === 'fil-dash-act' || id === 'fil-dash-area') renderInicio();
   if(id.startsWith('f-') && !id.startsWith('f-hora') && !id.startsWith('fil-')) saveDraft('f');
   if(id.startsWith('mf-')) saveDraft('mf');
 }

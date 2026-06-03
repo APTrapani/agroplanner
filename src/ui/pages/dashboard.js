@@ -77,11 +77,14 @@ export const Dashboard = Object.freeze({
     const hoy = isoHoy();
     if (fd && !fd.value) fd.value = hoy;
     if (fh && !fh.value) fh.value = hoy;
-    if (!document.querySelector('#ss-list-fil-dash-act .ss-opt')) {
-      const acts = (_getMaestroActividades() || [])
-        .map(a => typeof a === 'string' ? a : (a.actividad || '')).filter(Boolean);
-      if (typeof window.ssLoad === 'function') window.ssLoad('fil-dash-act', acts);
-    }
+    // Cargar opciones de actividad — siempre recargar para reflejar maestros actualizados
+    const acts = (_getMaestroActividades() || [])
+      .map(a => typeof a === 'string' ? a : (a.actividad || '')).filter(Boolean);
+    if (typeof window.ssLoad === 'function') window.ssLoad('fil-dash-act', acts);
+    // Cargar opciones de área
+    const areas = (window.DB?.maestros?.areas || [])
+      .map(a => typeof a === 'string' ? a : (a.nombre || '')).filter(Boolean);
+    if (typeof window.ssLoad === 'function') window.ssLoad('fil-dash-area', areas);
   },
 
   /** Retorna la función de filtro activa según los controles del dashboard */
@@ -89,10 +92,12 @@ export const Dashboard = Object.freeze({
     const hoy   = isoHoy();
     const desde = document.getElementById('fil-dash-desde')?.value || hoy;
     const hasta = document.getElementById('fil-dash-hasta')?.value || hoy;
-    const act   = document.getElementById('fil-dash-act')?.value || '';
+    const act   = document.getElementById('fil-dash-act')?.value  || '';
+    const area  = document.getElementById('fil-dash-area')?.value || '';
     return r => {
       if (r.fecha < desde || r.fecha > hasta) return false;
-      if (act && r.actividad !== act) return false;
+      if (act  && r.actividad !== act)  return false;
+      if (area && r.area      !== area) return false;
       return true;
     };
   },

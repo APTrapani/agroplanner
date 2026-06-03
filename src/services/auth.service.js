@@ -231,6 +231,10 @@ export const AuthService = Object.freeze({
     if (sidebarCfg) sidebarCfg.style.display = isAdmin ? 'flex' : 'none';
     if (navNuevo)   navNuevo.style.display   = (isAdmin || perms.nuevo)    ? '' : 'none';
     if (navRep)     navRep.style.display     = (isAdmin || perms.reportes) ? '' : 'none';
+
+    // Botón Visual Editor — solo visible para administradores
+    const btnVe = el('btn-ve');
+    if (btnVe) btnVe.style.display = isAdmin ? 'inline-flex' : 'none';
   },
 
   /**

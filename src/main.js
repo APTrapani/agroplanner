@@ -96,8 +96,14 @@ function bootstrap() {
   // Caso B: main.js cargó antes que cargarRegistros() terminara
   // Escuchar el evento que dispara cargarRegistros() al terminar
   document.addEventListener('agroplanner:data-ready', () => {
-    Dashboard.render();
-    Reportes.render();
+    // Usar renderInicio del monolito — ya incluye re-aplicar el VE
+    if (typeof window.renderInicio === 'function') {
+      window.renderInicio();
+      Reportes.render();
+    } else {
+      Dashboard.render();
+      Reportes.render();
+    }
   }, { once: true });
 }
 

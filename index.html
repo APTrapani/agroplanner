@@ -106,7 +106,6 @@ body{font-family:var(--font);background:var(--bg-base);color:var(--text-main);fo
 .ps{font-size:12px;color:var(--text-label);margin-top:4px}
 
 
-
 /* ── SIDEBAR COLAPSABLE ── */
 .sidebar{transition:width .25s cubic-bezier(.4,0,.2,1)}
 .sidebar.collapsed{width:52px;padding:.75rem .35rem}
@@ -171,7 +170,6 @@ body{font-family:var(--font);background:var(--bg-base);color:var(--text-main);fo
 .ss-opt:hover,.ss-opt.focused{background:var(--primary-bg);color:var(--green-dark)}
 .ss-opt.selected{background:var(--primary-bg);color:var(--green-dark);font-weight:600}
 .ss-empty{padding:10px 12px;font-size:12px;color:var(--text-label);text-align:center}
-
 
 
 /* ── LOTES MULTI-SELECT — mismo estilo que ss-wrap ── */
@@ -803,8 +801,8 @@ tr.reg-selected td{background:rgba(74,153,96,.06)!important}
             </div>
             <div id="area-pie-total" style="display:none"></div>
             <div id="area-pie-wrap" style="display:flex;align-items:center;gap:.6rem;flex:1">
-              <div id="area-pie-container" style="flex:0 0 auto">
-                <svg id="area-pie-svg" viewBox="-1 -1 202 202" style="display:block;width:72px;height:72px"></svg>
+              <div id="area-pie-container" style="flex:0 0 auto;width:112px;height:112px">
+                <svg id="area-pie-svg" viewBox="-1 -1 202 202" style="display:block;width:112px;height:112px"></svg>
               </div>
               <div id="area-pie-legend" style="flex:1;display:flex;flex-direction:column;gap:.2rem;min-width:0"></div>
             </div>
@@ -1456,19 +1454,42 @@ tr.reg-selected td{background:rgba(74,153,96,.06)!important}
 </div>
 
 <script>
+/**
+ * AgroPlanner — index.html (Script principal)
+ * ══════════════════════════════════════════════════════════════
+ *
+ * ARQUITECTURA: Monolito en migración incremental hacia ES Modules.
+ * Los módulos en src/ son la fuente de verdad para la lógica delegada.
+ * Las funciones aquí actúan como puentes que llaman window.AgroPlanner.*
+ *
+ * MÓDULOS EN src/ (window.AgroPlanner.*):
+ *   core/           → config · state · utils
+ *   services/       → auth.service · sheets.service · storage.service
+ *   audit/          → audit.service
+ *   validators/     → forms.validator
+ *   ui/components/  → toast · searchable-select · multi-select
+ *   ui/pages/       → dashboard · reportes · nav · nuevo-registro
+ *   ui/pages/config → areas · actividades · cultivos · responsables · contratas · usuarios
+ *
+ * PENDIENTE DE MIGRAR:
+ *   - Formulario de registro (guardarRegistro, initForm, drafts)
+ *   - Selector de lotes (renderLotesDD, initCascada)
+ *   - Formulario móvil (guardarRegistroMob)
+ *   - Visual Editor (VE)
+ *   - CSS → assets/css/main.css
+ * ══════════════════════════════════════════════════════════════
+ */
+
 /* ═══════════ CONFIG ═══════════ */
 window.CFG={
   APPS_SCRIPT_URL:'https://script.google.com/macros/s/AKfycbz06r4ZEXqk1muDdze7X6_mmcLKL6au0Ze2EUAENNrEm1V-rTMwloXoTMBGMsFfcV_VMg/exec',
   SHEET_ID:'1X2LIIsoR3Q35oCjQmWlEqrpoVDAkcyjGLBwfMTBIGCg',
   SHEET_NAME:'Registros'
 };
-const CFG = window.CFG; // alias para compatibilidad con código existente
+const CFG = window.CFG;
 
 /* ═══════════ DB ═══════════ */
-/* ⚠️  AVISO DE SEGURIDAD: Las contraseñas se almacenan en texto plano en localStorage.
-   Esto es aceptable para un sistema de intranet local sin datos sensibles de terceros,
-   pero NO debe usarse como autenticación en producción expuesta a internet.
-   Para mayor seguridad, considerar hash SHA-256 via Web Crypto API antes de guardar. */
+/* Contraseñas almacenadas como hash SHA-256 via Web Crypto API (auth.service.js) */
 const DB_KEY='campo_v3';
 const PERMS_DEF={inicio:true,nuevo:true,reportes:true,exportar:false};
 const DB_DEF={
@@ -1491,11 +1512,11 @@ const DB_DEF={
 };
 
 window.DB=(()=>{try{const s=localStorage.getItem(DB_KEY);return s?JSON.parse(s):JSON.parse(JSON.stringify(DB_DEF));}catch{return JSON.parse(JSON.stringify(DB_DEF));}})();
-let DB = window.DB; // alias para compatibilidad con código existente
+let DB = window.DB;
 const save=()=>{localStorage.setItem(DB_KEY,JSON.stringify(window.DB));window.DB=DB;};
-window.save = save; // exponer para módulos ES
+window.save = save;
 window.S={usuario:null,lotes:[],lotesMap:{},registros:[],editUserId:null,editCultivoIdx:null,confirmCb:null,seg:'hoy'};
-let S = window.S; // alias para compatibilidad con código existente
+let S = window.S;
 
 /* ═══════════ UTILS ═══════════ */
 const isoHoy=()=>{ const d=new Date(); const pad=n=>String(n).padStart(2,'0'); return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate()); };
@@ -1541,7 +1562,6 @@ function fechaCorta(iso){
   return`${d}/${m}/${y}`;
 }
 
-// toast y sync — delegadas a Toast component (Fase 3)
 function toast(msg, t='') { window.AgroPlanner.Toast.toast(msg, t); }
 function sync(s, txt)     { window.AgroPlanner.Toast.sync(s, txt); }
 
@@ -1563,7 +1583,6 @@ function pFil(id,lista,label){
 }
 
 /* ═══════════ AUTH ═══════════ */
-// doLogin — delegada a AuthService
 async function doLogin(){
   const user    = document.getElementById('inp-user').value.trim();
   const pass    = document.getElementById('inp-pass').value;
@@ -1601,12 +1620,10 @@ async function doLogin(){
   setTimeout(()=>VE.init(), 300);
 }
 
-// aplicarPermisos — delegada a AuthService
 function aplicarPermisos(u){
   window.AgroPlanner.AuthService.applyPermissions(u);
 }
 
-// doLogout — delegada a AuthService
 function doLogout(){
   S.usuario = null;
   window.AgroPlanner.AuthService.logout();
@@ -1633,36 +1650,8 @@ function toggleFiltros(){
   chev.style.transform=open?'rotate(180deg)':'rotate(0deg)';
 }
 
-// initFiltrosDash — delegada a Dashboard (Fase 4)
 function initFiltrosDash(){ _whenReady(() => window.AgroPlanner.Dashboard.initFiltros()); }
-function _initFiltrosDashOriginal(){
-  // Fechas: hoy por defecto en ambos campos
-  const fd=document.getElementById('fil-dash-desde');
-  const fh=document.getElementById('fil-dash-hasta');
-  const hoy=isoHoy();
-  if(fd&&!fd.value) fd.value=hoy;
-  if(fh&&!fh.value) fh.value=hoy;
-  // Actividad: poblar ss solo si aún no tiene datos
-  if(!document.querySelector('#ss-list-fil-dash-act .ss-opt')){
-    const acts=(DB.maestros.actividades||[]).map(a=>typeof a==='string'?a:(a.actividad||'')).filter(Boolean);
-    ssLoad('fil-dash-act', acts);
-  }
-}
-
-// getSegFiltro — delegada a Dashboard (Fase 4)
 function getSegFiltro(){ return window._agroModulosListos ? window.AgroPlanner.Dashboard.getSegFiltro() : (()=>true); }
-function _getSegFiltroOriginal(){
-  const hoy=isoHoy();
-  const desde=(document.getElementById('fil-dash-desde')?.value)||hoy;
-  const hasta=(document.getElementById('fil-dash-hasta')?.value)||hoy;
-  const act=(document.getElementById('fil-dash-act')?.value)||'';
-  return r=>{
-    if(r.fecha<desde||r.fecha>hasta) return false;
-    if(act && r.actividad!==act) return false;
-    return true;
-  };
-}
-
 /* ═══════════ INICIO / DASHBOARD ═══════════ */
 /* ═══════════════════════════════════════════════════════
    FASE 4: Bridges hacia módulos Dashboard y Reportes
@@ -1674,246 +1663,24 @@ function _whenReady(fn) {
   document.addEventListener('agroplanner:ready', fn, { once: true });
 }
 
-// renderInicio — delegada a Dashboard (Fase 4)
 function renderInicio(){
   _whenReady(() => {
     window.AgroPlanner.Dashboard.render();
-    // Segundo render con doble rAF para que los contenedores SVG tengan ancho real
-    requestAnimationFrame(() => requestAnimationFrame(() => {
-      window.AgroPlanner.Dashboard.render();
-    }));
-  });
-}
-function _renderInicioOriginal(){
-  document.getElementById('inicio-fecha').textContent=fechaLarga();
-  initFiltrosDash();
-  const filtro=getSegFiltro();
-  const regs=S.registros.filter(filtro);
-  const total=regs.reduce((s,r)=>s+(parseInt(r.nPersonas)||0),0);
-  const propio=regs.filter(r=>r.tipo==='Propio').reduce((s,r)=>s+(parseInt(r.nPersonas)||0),0);
-  const contrata=regs.filter(r=>r.tipo==='Contrata').reduce((s,r)=>s+(parseInt(r.nPersonas)||0),0);
-  const pctP=total?Math.round(propio/total*100):0;
-  const pctC=total?Math.round(contrata/total*100):0;
-
-  // KPIs con animación de conteo
-  animCount('k-total', total);
-  animCount('k-propio', propio);
-  animCount('k-contrata', contrata);
-
-  document.getElementById('k-total-h').innerHTML=total
-    ? `<span class="kpi-badge neutral">${regs.length} registros</span>`
-    : '<span style="color:var(--text-muted)">Sin actividad</span>';
-  document.getElementById('k-pp').innerHTML=total
-    ? `<span class="kpi-badge up">${pctP}% del total</span>`
-    : '<span style="color:var(--text-muted)">—</span>';
-  document.getElementById('k-cp').innerHTML=total
-    ? `<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:20px;background:#fef3c7;color:#b45309;display:inline-flex;align-items:center;gap:3px">${pctC}% del total</span>`
-    : '<span style="color:var(--text-muted)">—</span>';
-
-  // Barras de progreso KPI
-  setTimeout(()=>{
-    const pp=document.getElementById('k-propio-prog');
-    const cp=document.getElementById('k-contrata-prog');
-    if(pp) pp.style.width=pctP+'%';
-    if(cp) cp.style.width=pctC+'%';
-  },100);
-
-  // Datos por dimensión
-  const byA={},byArea={},byResp={};
-  regs.forEach(r=>{
-    if(r.actividad)byA[r.actividad]=(byA[r.actividad]||0)+(parseInt(r.nPersonas)||0);
-    if(r.area)byArea[r.area]=(byArea[r.area]||0)+(parseInt(r.nPersonas)||0);
-    if(r.responsable){
-      const np=parseInt(r.nPersonas)||0;
-      if(!byResp[r.responsable]) byResp[r.responsable]={propio:0,contrata:0,contratas:{},total:0};
-      byResp[r.responsable].total+=np;
-      if(r.tipo==='Propio') byResp[r.responsable].propio+=np;
-      else if(r.tipo==='Contrata'){
-        byResp[r.responsable].contrata+=np;
-        const c=r.contratista||'Sin contratista';
-        byResp[r.responsable].contratas[c]=(byResp[r.responsable].contratas[c]||0)+np;
+    // Después del render, re-aplicar estilos del VE
+    // renderAreaPie y otros renders sobreescriben los estilos guardados
+    requestAnimationFrame(() => {
+      if(typeof VE !== 'undefined' && VE.applyAllFrom){
+        try{
+          const saved = JSON.parse(localStorage.getItem('ve_cfg_v2')||'{}');
+          if(Object.keys(saved).length) VE.applyAllFrom(saved);
+        }catch(e){}
       }
-    }
+    });
   });
-
-  // ── KPI Foco operativo ──
-  {
-    const focoEl=document.getElementById('k-foco');
-    const focoH=document.getElementById('k-foco-h');
-    const focoProg=document.getElementById('k-foco-prog');
-    const actEntries=Object.entries(byA);
-    if(actEntries.length&&total){
-      const [focoAct,focoCnt]=actEntries.reduce((a,b)=>b[1]>a[1]?b:a);
-      const focoPct=Math.round(focoCnt/total*100);
-      focoEl.textContent=focoAct;
-      focoH.innerHTML=`<div style="display:flex;flex-direction:column;gap:4px;margin-top:2px">
-        <span style="display:inline-flex;align-items:center;gap:5px;background:rgba(74,153,96,.1);border:1px solid rgba(74,153,96,.25);color:#2d7a4e;border-radius:20px;padding:3px 10px;font-size:10px;font-weight:600;width:fit-content">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:10px;height:10px"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
-          ${focoPct}% del personal
-        </span>
-        <span style="font-size:11px;color:var(--text-sec)">${focoCnt} trabajadores activos</span>
-      </div>`;
-      setTimeout(()=>{focoProg.style.width=focoPct+'%';},100);
-    }else{
-      focoEl.textContent='—';
-      focoH.innerHTML='<span style="color:var(--text-muted)">Sin actividad</span>';
-      focoProg.style.width='0%';
-    }
-  }
-
-  // Gradientes para barras
-  const GRAD_ACT=[
-    'linear-gradient(90deg,#4a9960,#1a3320)',
-    'linear-gradient(90deg,#7ec896,#2d5a3d)',
-    'linear-gradient(90deg,#34d399,#059669)',
-    'linear-gradient(90deg,#6ee7b7,#10b981)',
-    'linear-gradient(90deg,#a7f3d0,#34d399)'
-  ];
-  const GRAD_AREA=[
-    'linear-gradient(90deg,#b45309,#92400e)',
-    'linear-gradient(90deg,#fbbf24,#b45309)',
-    'linear-gradient(90deg,#fcd34d,#d97706)',
-    'linear-gradient(90deg,#fde68a,#f59e0b)'
-  ];
-  const GRAD_RESP=[
-    'linear-gradient(90deg,#1d4ed8,#1e3a8a)',
-    'linear-gradient(90deg,#60a5fa,#2563eb)',
-    'linear-gradient(90deg,#93c5fd,#3b82f6)',
-    'linear-gradient(90deg,#bfdbfe,#60a5fa)'
-  ];
-
-  // Desglose propio/contrata por actividad para las barras
-  const byADesglose = {};
-  regs.forEach(r=>{
-    const key = r.actividad||'Sin actividad';
-    if(!byADesglose[key]) byADesglose[key]={propio:0,contrata:0,contratas:{}};
-    const np=parseInt(r.nPersonas)||0;
-    if(r.tipo==='Propio') byADesglose[key].propio+=np;
-    else if(r.tipo==='Contrata'){
-      byADesglose[key].contrata+=np;
-      const c=r.contratista||'Sin contratista';
-      byADesglose[key].contratas[c]=(byADesglose[key].contratas[c]||0)+np;
-    }
-  });
-
-  renderAreaPie(byArea);
-  renderEvolucion();
-  renderResumen(regs);
-  renderDonut(propio, contrata, total);
-
-  requestAnimationFrame(()=>{
-    renderStackedAct(byADesglose);
-    renderBarsResp(byResp);
-  });
-
-  // Tabla últimos registros
 }
-
-// animCount — delegada a Dashboard (Fase 4)
 function animCount(id,target){ window.AgroPlanner.Dashboard.animCount(id,target); }
-function _animCountOriginal(id, target){
-  const el=document.getElementById(id);
-  if(!el) return;
-  // Cancelar animación previa si existe (evita stacking de intervalos en re-renders)
-  if(el._animT) clearInterval(el._animT);
-  const start=parseInt(el.textContent)||0;
-  const dur=400, steps=20, inc=(target-start)/steps;
-  let cur=start, i=0;
-  el._animT=setInterval(()=>{
-    i++; cur+=inc;
-    el.textContent=Math.round(i===steps?target:cur);
-    if(i>=steps){ clearInterval(el._animT); el._animT=null; }
-  }, dur/steps);
-}
-
-// renderDonut — delegada a Dashboard (Fase 4)
 function renderDonut(p,c,t){ window.AgroPlanner.Dashboard.renderDonut(p,c,t); }
-function _renderDonutOriginal(propio, contrata, total){
-  const svg=document.getElementById('donut-svg');
-  const legend=document.getElementById('donut-legend');
-  if(!svg||!legend) return;
-  const cx=55,cy=55,r=40,stroke=14;
-  const circ=2*Math.PI*r;
-  if(!total){
-    svg.innerHTML=`<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="var(--border-base)" stroke-width="${stroke}"/>
-      <text x="${cx}" y="${cy}" text-anchor="middle" dominant-baseline="middle" font-size="11" fill="var(--text-label)" font-family="var(--font)">Sin datos</text>`;
-    legend.innerHTML='';
-    return;
-  }
-  const pP=propio/total, pC=contrata/total;
-  const dP=circ*pP, dC=circ*pC;
-  const offP=circ*0.25; // start at top
-  const offC=offP-dP;
-  svg.innerHTML=`
-    <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="var(--border-base)" stroke-width="${stroke}"/>
-    <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="url(#gP)" stroke-width="${stroke}"
-      stroke-dasharray="${dP} ${circ-dP}" stroke-dashoffset="${offP}" stroke-linecap="round"
-      style="transition:stroke-dasharray .6s ease"/>
-    <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="url(#gC)" stroke-width="${stroke}"
-      stroke-dasharray="${dC} ${circ-dC}" stroke-dashoffset="${offC}" stroke-linecap="round"
-      style="transition:stroke-dasharray .6s ease"/>
-    <defs>
-      <linearGradient id="gP" x1="0%" y1="0%" x2="100%" y2="0%">
-        <stop offset="0%" stop-color="#4a9960"/><stop offset="100%" stop-color="#1a3320"/>
-      </linearGradient>
-      <linearGradient id="gC" x1="0%" y1="0%" x2="100%" y2="0%">
-        <stop offset="0%" stop-color="#fcd34d"/><stop offset="100%" stop-color="#b45309"/>
-      </linearGradient>
-    </defs>
-    <text x="${cx}" y="${cy-6}" text-anchor="middle" dominant-baseline="middle" font-size="18" font-weight="700" fill="var(--green-dark)" font-family="var(--mono)">${total}</text>
-    <text x="${cx}" y="${cy+10}" text-anchor="middle" dominant-baseline="middle" font-size="9" fill="var(--text-label)" font-family="var(--font)" text-transform="uppercase">total</text>`;
-  const pctP=Math.round(pP*100), pctC=Math.round(pC*100);
-  legend.innerHTML=`
-    <div class="donut-leg-item">
-      <div class="donut-leg-dot" style="background:var(--green-bright)"></div>
-      <span class="donut-leg-label">Propio</span>
-      <span class="donut-leg-val">${propio}</span>
-      <span class="donut-leg-pct">${pctP}%</span>
-    </div>
-    <div class="donut-leg-item">
-      <div class="donut-leg-dot" style="background:#b45309"></div>
-      <span class="donut-leg-label">Contrata</span>
-      <span class="donut-leg-val">${contrata}</span>
-      <span class="donut-leg-pct">${pctC}%</span>
-    </div>`;
-}
-
-// renderBars — delegada a Dashboard (Fase 4)
 function renderBars(i,o,g,l=999,d=null){ window.AgroPlanner.Dashboard.renderBars(i,o,g,l,d); }
-function _renderBarsOriginal(id, obj, grads, limit=999, desglose=null){
-  const el = document.getElementById(id);
-  if(!el) return;
-  const en = Object.entries(obj).sort((a,b)=>b[1]-a[1]).slice(0,limit);
-  if(!en.length){el.innerHTML='<div style="font-size:12px;color:var(--text-muted);padding:.5rem 0">Sin datos para el período.</div>';return;}
-  const mx = Math.max(...en.map(e=>e[1]),1);
-  el.innerHTML = en.map(([k,v],i)=>{
-    const d = desglose ? desglose[k] : null;
-    let subtext = '';
-    if(d){
-      const parts = [];
-      if(d.propio > 0) parts.push(`<span style="color:#16a34a;font-weight:600">${d.propio} propio</span>`); /* PARCHE-1: comparación explícita, 0 no suprime etiqueta */
-      if(d.contratas && Object.keys(d.contratas).length){
-        for(const [cont, cnt] of Object.entries(d.contratas)){
-          parts.push(`<span style="color:#b45309;font-weight:600">${cnt} ${cont||'contrata'}</span>`);
-        }
-      } else if(d.contrata){
-        parts.push(`<span style="color:#b45309;font-weight:600">${d.contrata} contrata</span>`);
-      }
-      if(parts.length) subtext = `<div style="font-size:10px;color:var(--text-label);margin-top:2px;display:flex;flex-wrap:wrap;gap:6px">${parts.join('')}</div>`;
-    }
-    return `<div class="bar-row" style="align-items:flex-start;margin-bottom:${subtext?14:10}px">
-      <div style="width:160px;flex-shrink:0">
-        <div class="bar-name" title="${k}" style="width:100%;white-space:normal;line-height:1.3;font-size:11px">${k}</div>
-        ${subtext}
-      </div>
-      <div style="flex:1;padding-top:3px">
-        <div class="bar-track"><div class="bar-fill" style="width:${Math.round(v/mx*100)}%;background:${grads[i%grads.length]}"></div></div>
-      </div>
-      <span class="bar-val" style="padding-top:2px">${v}</span>
-    </div>`;
-  }).join('');
-}
-
 /* ═══════════ FORM ═══════════ */
 
 /* ══════════════════════════════════════════════════
@@ -2158,8 +1925,7 @@ function toggleLoteDD(n, modulo, etapa, event){
 function toggleTodosLotesDD(){
   const q = (document.getElementById('lotes-search')?.value || '').toLowerCase().trim();
   const grupos = getGruposModulo();
-  const todos = grupos.flatMap(g => g.lotes.map(l => ({n:l.n, cult:l.cult||'', modulo:g.modulo, etapa:g.etapa}))); /* PARCHE-2: incluir cult para que el filtro funcione */
-  /* PARCHE-2: filtro alineado con renderLotesDD — incluye campo cultivo */
+  const todos = grupos.flatMap(g => g.lotes.map(l => ({n:l.n, cult:l.cult||'', modulo:g.modulo, etapa:g.etapa})));
   const filtered = q ? todos.filter(l =>
     String(l.n).includes(q) ||
     (l.cult||'').toLowerCase().includes(q) ||
@@ -2333,7 +2099,6 @@ async function pushUsuariosASheets(){
   }catch(e){ sync('err','error'); throw e; }
 }
 
-// Enviar un maestro completo a Sheets — delegada a SheetsService
 async function pushMaestroASheets(tipo){
   const headers = MAESTROS_HEADERS[tipo];
   const rows = maestroToRows(tipo);
@@ -2358,7 +2123,6 @@ async function pullMaestroDeSheets(tipo){
 
 // Sincronizar TODO en una sola llamada (registros pendientes + todos los maestros)
 // Jalar TODO desde Sheets → reemplazar localStorage (cualquier usuario)
-// jalarTodoDeSheets — delegada a SheetsService
 async function jalarTodoDeSheets(){
   toast('Jalando datos de Sheets…');
   try{
@@ -2380,7 +2144,7 @@ async function jalarTodoDeSheets(){
 }
 
 // Publicar un maestro específico al Sheets (solo admin)
-async function publicarMaestro(tipo, event){ /* PARCHE-3: event como parámetro explícito */
+async function publicarMaestro(tipo, event){
   if(tipo==='usuarios'){
     const btn=event?.currentTarget;
     if(btn){const orig=btn.innerHTML;btn.disabled=true;btn.textContent='Publicando…';}
@@ -2419,7 +2183,7 @@ async function saveYSync(tipo, btnId=null){
   }
 }
 
-/* ═══════════ SHEETS API — delegada a SheetsService ═══════════ */
+/* ═══════════ SHEETS API (delegada a src/services/sheets.service.js) ═══════════ */
 async function enviarASheets(reg){
   await window.AgroPlanner.SheetsService.enviarRegistro(reg, CFG.APPS_SCRIPT_URL);
 }
@@ -2481,7 +2245,6 @@ function limpiarHora(val){
   return s;
 }
 
-// cargarRegistros — delegada a SheetsService
 async function cargarRegistros(){
   sync('load','sincronizando…');
   try{
@@ -2511,7 +2274,6 @@ async function cargarRegistros(){
   }
 }
 
-// cargarRegistrosGviz — delegada a SheetsService (fallback cuando Apps Script falla)
 async function cargarRegistrosGviz(){
   const _gvizRegs = await window.AgroPlanner.SheetsService.cargarGviz(CFG.SHEET_ID, CFG.SHEET_NAME);
   S.registros.splice(0, S.registros.length, ..._gvizRegs); // mantiene la referencia compartida con window.S
@@ -2521,146 +2283,10 @@ async function cargarRegistrosGviz(){
 }
 
 /* ═══════════ REPORTES ═══════════ */
-// renderReportes — delegada a Reportes (Fase 4)
 function renderReportes(){ _whenReady(() => window.AgroPlanner.Reportes.render()); }
-function _renderReportesOriginal(){
-  const regs=filtrar();
-  document.getElementById('rep-cnt').textContent=regs.length+' registro'+(regs.length!==1?'s':', ')+' · '+regs.reduce((s,r)=>s+r.nPersonas,0)+' personas';
-  pFil('fil-fecha',[...new Set(S.registros.map(r=>r.fecha))].sort().reverse(),'Todas las fechas');
-  pFil('fil-area',[...new Set(S.registros.map(r=>r.area))].filter(Boolean).sort(),'Todas las áreas');
-  pFil('fil-act',[...new Set(S.registros.map(r=>r.actividad))].filter(Boolean).sort(),'Todas las actividades');
-  const tbody=document.getElementById('tbody-rep');
-  if(!regs.length){
-    tbody.innerHTML='<tr><td colspan="9"><div class="empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>No se encontraron registros.</div></td></tr>';
-    return;
-  }
-  const isAdmin = S.usuario?.rol==='admin';
-  tbody.innerHTML=regs.map(r=>{
-    const idx=S.registros.indexOf(r);
-    const sel=regSeleccionados.has(idx);
-    return `<tr id="rep-row-${idx}" style="${sel?'background:rgba(16,185,129,.06)':''}">
-      <td style="text-align:center;width:40px">${isAdmin?`<input type="checkbox" ${sel?'checked':''} onchange="toggleRegSel(${idx},this)" style="accent-color:var(--primary);cursor:pointer;width:14px;height:14px">`:''}</td>
-      <td class="mc" style="white-space:nowrap">${fechaCorta(r.fecha)}</td>
-      <td class="mc">${r.hora||'—'}</td>
-      <td class="mc">${r.horaFin||'—'}</td>
-      <td>${r.area}</td>
-      <td style="font-weight:500;color:var(--text-main)">${r.responsable}</td>
-      <td style="font-family:var(--mono);font-size:11px;color:var(--text-sec)">${r.lotes||'—'}</td>
-      <td><span class="pill pill-${r.tipo?.toLowerCase()}">${r.tipo}</span></td>
-      <td style="font-size:11px;color:var(--text-sec)">${r.contratista||'—'}</td>
-      <td>${r.actividad}</td>
-      <td style="font-size:11px;color:var(--text-sec)">${r.tarea||'—'}</td>
-      <td style="font-weight:700;text-align:center;font-family:var(--mono);color:var(--green-dark)">${r.nPersonas}</td>
-      <td style="font-size:11px;color:var(--text-sec);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r.obs||''}">${r.obs||'—'}</td>
-      <td style="text-align:center;width:80px">${isAdmin?`<div style="display:flex;gap:4px;justify-content:center">
-          <button class="ib" onclick="abrirEditReg(${idx})" title="Editar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg></button>
-          <button class="ib del" onclick="abrirConfirm('¿Eliminar este registro?',()=>eliminarUnRegistro(${idx}))" title="Eliminar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
-        </div>`:'—'}</td>
-    </tr>`;
-  }).join('');
-  const allChk=document.getElementById('chk-all-reg');
-  if(allChk){allChk.indeterminate=regSeleccionados.size>0&&regSeleccionados.size<regs.length;allChk.checked=regSeleccionados.size===regs.length&&regs.length>0;}
-  const delBtn=document.getElementById('rep-del-sel-btn');const selCnt=document.getElementById('rep-sel-cnt');
-  if(delBtn)delBtn.style.display=(isAdmin&&regSeleccionados.size>0)?'':'none';
-  if(selCnt)selCnt.textContent=regSeleccionados.size;
-}
-
-// filtrar — delegada a Reportes (Fase 4)
 function filtrar(){ return window._agroModulosListos ? window.AgroPlanner.Reportes.filtrar() : []; }
-function _filtrarOriginal(){
-  const fecha=document.getElementById('fil-fecha').value;
-  const area=document.getElementById('fil-area').value;
-  const tipo=document.getElementById('fil-tipo').value;
-  const act=document.getElementById('fil-act').value;
-  return S.registros.filter(r=>
-    (!fecha||r.fecha===fecha)&&(!area||r.area===area)&&(!tipo||r.tipo===tipo)&&(!act||r.actividad===act)
-  );
-}
-
 /* ═══════════ EXPORTAR EXCEL ═══════════ */
-// exportarExcel — delegada a Reportes (Fase 4)
 function exportarExcel(){ _whenReady(() => window.AgroPlanner.Reportes.exportarExcel()); }
-function _exportarExcelOriginal(){
-  const perms=S.usuario?.perms||{};
-  const isAdmin=S.usuario?.rol==='admin';
-  if(!isAdmin&&!perms.exportar){toast('No tienes permiso para exportar','err');return;}
-
-  const regs=filtrar();
-  if(!regs.length){toast('No hay registros para exportar','err');return;}
-
-  // Construir datos con tipos correctos
-  const wsData=[
-    ['Fecha','Hora Inicio','Hora Término','Área','Responsable','Lote(s)','Tipo Personal','Contratista','Actividad','Tarea/Meta','N° Personas','Observaciones','Registrado por']
-  ];
-
-  regs.forEach(r=>{
-    // Fecha como objeto Date real para Excel
-    let fechaExcel=r.fecha;
-    let dateObj=null;
-    if(r.fecha&&r.fecha.match(/^\d{4}-\d{2}-\d{2}$/)){
-      const[y,m,d]=r.fecha.split('-').map(Number);
-      dateObj=new Date(y,m-1,d);
-    }
-
-    // Hora como string HH:MM
-    let horaStr=r.hora||'';
-
-    wsData.push([
-      dateObj||r.fecha,
-      horaStr,
-      r.horaFin||'',
-      r.area,
-      r.responsable,
-      r.lotes,
-      r.tipo,
-      r.contratista||'',
-      r.actividad,
-      r.tarea||'',
-      parseInt(r.nPersonas)||0,
-      r.obs||'',
-      r.registradoPor||''
-    ]);
-  });
-
-  const wb=XLSX.utils.book_new();
-  const ws=XLSX.utils.aoa_to_sheet(wsData);
-
-  // Formato de fecha en la columna A (col 0)
-  const fmtFecha='DD/MM/YYYY';
-  const fmtHora='HH:MM';
-  for(let i=1;i<wsData.length;i++){
-    const cellRef=XLSX.utils.encode_cell({r:i,c:0});
-    if(ws[cellRef]&&wsData[i][0] instanceof Date){
-      ws[cellRef].t='d';
-      ws[cellRef].z=fmtFecha;
-    }
-  }
-
-  // Ancho de columnas
-  ws['!cols']=[
-    {wch:12},{wch:8},{wch:8},{wch:18},{wch:20},{wch:16},{wch:12},{wch:20},{wch:28},{wch:20},{wch:10},{wch:36},{wch:20}
-  ];
-
-  // Estilo encabezado (SheetJS CE no tiene estilos, pero si usamos xlsx-style sí)
-  XLSX.utils.book_append_sheet(wb,ws,'Registros');
-
-  // Hoja resumen
-  const resumenData=[['Resumen del reporte'],[''],['Total registros',regs.length],['Total personas',regs.reduce((s,r)=>s+r.nPersonas,0)]];
-  const byTipo={};regs.forEach(r=>{byTipo[r.tipo]=(byTipo[r.tipo]||0)+r.nPersonas;});
-  Object.entries(byTipo).forEach(([k,v])=>resumenData.push([k,v]));
-  resumenData.push(['']);
-  const byAct={};regs.forEach(r=>{byAct[r.actividad]=(byAct[r.actividad]||0)+r.nPersonas;});
-  resumenData.push(['Por actividad','Personas']);
-  Object.entries(byAct).sort((a,b)=>b[1]-a[1]).forEach(([k,v])=>resumenData.push([k,v]));
-  const wsR=XLSX.utils.aoa_to_sheet(resumenData);
-  wsR['!cols']=[{wch:30},{wch:15}];
-  XLSX.utils.book_append_sheet(wb,wsR,'Resumen');
-
-  const ts=new Date().toISOString().slice(0,10);
-  XLSX.writeFile(wb,`campo-mano-obra-${ts}.xlsx`);
-  toast('Excel exportado','ok');
-}
-
 /* ═══════════ CONFIG ═══════════ */
 /* ═══════════ CONFIGURACIÓN — navegación por secciones ═══════════ */
 let cfgSeccionActiva = null;
@@ -3200,59 +2826,46 @@ function importarCultivos(input){
 
 
 
-/* ── HELPER SHARED: barras horizontales apiladas en 2 columnas internas ── */
-// renderDualColBars — delegada a Dashboard (Fase 4)
-function renderDualColBars(a,b,c,d,e){ window.AgroPlanner.Dashboard.renderDualColBars(a,b,c,d,e); }
-function _renderDualColBarsOriginal(containerId, entries, allContratas, maxVal, CONTRATA_COLORS){
+/* ── IMPLEMENTACIONES DE GRÁFICOS DE BARRAS ── */
+/* renderDualColBars, renderBarsRespImpl, renderStackedActImpl
+   Lógica extraída del original. Expuestas en window.* para dashboard.js */
+
+window.renderDualColBarsImpl = function(containerId, entries, allContratas, maxVal, CONTRATA_COLORS){
   const el = document.getElementById(containerId);
   if(!el) return;
-
-  // Leer overrides del Visual Editor si existen
   const ov = (window._ve_chart_overrides||{})[containerId]||{};
-  const BAR_H = ov.barH  !== undefined ? ov.barH  : 20;
-  const GAP   = ov.barGap!== undefined ? ov.barGap : 9;
+  const BAR_H = ov.barH !== undefined ? ov.barH : 20;
+  const GAP   = ov.barGap !== undefined ? ov.barGap : 9;
   const PAD_T = 2;
   const COLOR_PROPIO = ov.colPropio || '#4a9960';
-
   const maxLen = Math.max(...entries.map(e=>e.label.length));
   const labelW = Math.min(290, Math.max(140, Math.ceil(maxLen * 7.8)));
   const numW = 32;
-
   const half = Math.ceil(entries.length / 2);
   const col1 = entries.slice(0, half);
   const col2 = entries.slice(half);
-
-  // Escala por columna: cada columna usa su propio máximo
   const maxCol1 = Math.max(...col1.map(e=>e.total), 1);
   const maxCol2 = Math.max(...col2.map(e=>e.total), 1);
-
   const style  = window.getComputedStyle(el);
   const padH   = parseFloat(style.paddingLeft||0) + parseFloat(style.paddingRight||0);
   const availW = Math.max((el.clientWidth - padH - 8) / 2, 100);
   const TRACK_W = Math.max(availW - labelW - numW - 10, 40);
-
   const LABEL_FS = ov.labelS !== undefined ? ov.labelS : 11.5;
   const LABEL_FF = ov.labelF || 'var(--font)';
-
   function buildCol(items, colMax){
     const svgH = PAD_T * 2 + items.length * (BAR_H + GAP) - GAP;
     const W = labelW + TRACK_W + numW + 8;
-
     let rows = '';
     items.forEach((e, i) => {
       const y = PAD_T + i * (BAR_H + GAP);
       const xTrack = labelW;
-
-      rows += `<text x="${labelW - 5}" y="${y + BAR_H/2 + 1}" text-anchor="end" dominant-baseline="middle"
-        font-size="${LABEL_FS}" font-weight="600" fill="var(--text-main)" font-family="${LABEL_FF}">${e.label}</text>`;
+      rows += `<text x="${labelW - 5}" y="${y + BAR_H/2 + 1}" text-anchor="end" dominant-baseline="middle" font-size="${LABEL_FS}" font-weight="600" fill="var(--text-main)" font-family="${LABEL_FF}">${e.label}</text>`;
       rows += `<rect x="${xTrack}" y="${y}" width="${TRACK_W}" height="${BAR_H}" rx="4" fill="var(--border-base)" opacity=".3"/>`;
-
       let curX = xTrack;
       const hasContratas = Object.keys(e.contratas||{}).length > 0;
       const hasPropio = e.propio > 0;
       const numSegmentos = (hasPropio ? 1 : 0) + Object.keys(e.contratas||{}).length;
       const multiSegmento = numSegmentos > 1;
-
       if(hasPropio){
         const wP = Math.max((e.propio / e.total) * TRACK_W, 1.5);
         rows += `<rect x="${curX.toFixed(1)}" y="${y}" width="${wP.toFixed(1)}" height="${BAR_H}" rx="4" fill="${COLOR_PROPIO}"/>`;
@@ -3268,77 +2881,59 @@ function _renderDualColBarsOriginal(containerId, entries, allContratas, maxVal, 
         if(multiSegmento) rows += `<text x="${(curX+wC/2).toFixed(1)}" y="${y+BAR_H/2+1}" text-anchor="middle" dominant-baseline="middle" font-size="10" font-weight="700" fill="#fff" font-family="var(--mono)">${cnt}</text>`;
         curX += wC;
       });
-
-      rows += `<text x="${(xTrack+TRACK_W+5).toFixed(1)}" y="${y+BAR_H/2+1}" dominant-baseline="middle"
-        font-size="13" font-weight="700" fill="var(--text-main)" font-family="var(--mono)">${e.total}</text>`;
+      rows += `<text x="${(xTrack+TRACK_W+5).toFixed(1)}" y="${y+BAR_H/2+1}" dominant-baseline="middle" font-size="13" font-weight="700" fill="var(--text-main)" font-family="var(--mono)">${e.total}</text>`;
     });
-
     return `<svg viewBox="0 0 ${W} ${svgH}" style="width:100%;height:${svgH}px;display:block">${rows}</svg>`;
   }
-
-  // Leyenda
   const legendItems = [
     `<span style="display:flex;align-items:center;gap:4px"><span style="width:9px;height:9px;background:#4a9960;border-radius:2px;display:inline-block"></span>Propio</span>`,
     ...allContratas.map((c,i)=>`<span style="display:flex;align-items:center;gap:4px"><span style="width:9px;height:9px;background:${CONTRATA_COLORS[i%CONTRATA_COLORS.length][0]};border-radius:2px;display:inline-block"></span>${c}</span>`)
   ];
   const legend = `<div style="display:flex;flex-wrap:wrap;gap:.3rem .75rem;margin-bottom:.5rem;font-size:10px;font-weight:600;color:var(--text-label)">${legendItems.join('')}</div>`;
-
   el.innerHTML = legend + `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;align-items:start;position:relative">
     <div style="padding-right:8px">${buildCol(col1, maxCol1)}</div>
     <div style="padding-left:8px">${buildCol(col2, maxCol2)}</div>
     <div style="position:absolute;left:50%;top:1%;height:98%;width:1px;background:var(--green-dark);opacity:0.25;border-radius:1px;transform:translateX(-50%)"></div>
   </div>`;
-}
+};
 
-/* ── BARRAS RESPONSABLES ── */
-// renderBarsResp — delegada a Dashboard (Fase 4)
-function renderBarsResp(b){ window.AgroPlanner.Dashboard.renderBarsResp(b); }
-function _renderBarsRespOriginal(byResp){
+window.renderBarsRespImpl = function(byResp){
   const el = document.getElementById('bars-resp');
   if(!el) return;
-
   const entries = Object.entries(byResp)
     .map(([k,d])=>({ label:k, propio:d.propio||0, contratas:d.contratas||{}, total:d.total||0 }))
     .filter(e=>e.total>0).sort((a,b)=>b.total-a.total);
-
-  if(!entries.length){
-    el.innerHTML='<div style="font-size:12px;color:var(--text-muted);padding:.5rem 0">Sin datos para el período.</div>';
-    return;
-  }
-
+  if(!entries.length){ el.innerHTML='<div style="font-size:12px;color:var(--text-muted);padding:.5rem 0">Sin datos para el período.</div>'; return; }
   const allContratas = [...new Set(entries.flatMap(e=>Object.keys(e.contratas)))];
   const maxVal = Math.max(...entries.map(e=>e.total), 1);
   const ovResp = (window._ve_chart_overrides||{})['bars-resp']||{};
   const c1Resp = ovResp.colContrata||'#f59e0b';
   const CONTRATA_COLORS = [[c1Resp,'#78350f'],['#ef4444','#7f1d1d'],['#8b5cf6','#3b0764'],['#06b6d4','#164e63'],['#f97316','#7c2d12'],['#ec4899','#500724']];
+  window.renderDualColBarsImpl('bars-resp', entries, allContratas, maxVal, CONTRATA_COLORS);
+};
 
-  renderDualColBars('bars-resp', entries, allContratas, maxVal, CONTRATA_COLORS);
-}
-
-/* ── COLUMNAS APILADAS: PERSONAS POR ACTIVIDAD ── */
-// renderStackedAct — delegada a Dashboard (Fase 4)
-function renderStackedAct(b){ window.AgroPlanner.Dashboard.renderStackedAct(b); }
-function _renderStackedActOriginal(byADesglose){
+window.renderStackedActImpl = function(byADesglose){
+  const el = document.getElementById('stacked-act');
+  if(!el) return;
   const entries = Object.entries(byADesglose)
     .map(([k,d])=>({ label:k, propio:d.propio||0, contratas:d.contratas||{}, total:(d.propio||0)+(d.contrata||0) }))
     .filter(e=>e.total>0).sort((a,b)=>b.total-a.total);
-
-  const el = document.getElementById('stacked-act');
-  if(!el) return;
-  if(!entries.length){
-    el.innerHTML='<div style="font-size:12px;color:var(--text-muted);padding:.5rem 0">Sin datos para el período.</div>';
-    return;
-  }
-
+  if(!entries.length){ el.innerHTML='<div style="font-size:12px;color:var(--text-muted);padding:.5rem 0">Sin datos para el período.</div>'; return; }
   const allContratas = [...new Set(entries.flatMap(e=>Object.keys(e.contratas)))];
   const maxVal = Math.max(...entries.map(e=>e.total), 1);
   const ovAct = (window._ve_chart_overrides||{})['stacked-act']||{};
   const c1Act = ovAct.colContrata||'#f59e0b';
   const CONTRATA_COLORS = [[c1Act,'#78350f'],['#ef4444','#7f1d1d'],['#8b5cf6','#3b0764'],['#06b6d4','#164e63'],['#f97316','#7c2d12'],['#ec4899','#500724']];
+  window.renderDualColBarsImpl('stacked-act', entries, allContratas, maxVal, CONTRATA_COLORS);
+};
 
-  renderDualColBars('stacked-act', entries, allContratas, maxVal, CONTRATA_COLORS);
-}
-/* ── PIE CHART PERSONAL POR ÁREA ── */
+
+/* ── HELPER SHARED: barras horizontales apiladas en 2 columnas internas ── */
+function renderDualColBars(a,b,c,d,e){ window.renderDualColBarsImpl(a,b,c,d,e); }
+/* ── BARRAS RESPONSABLES ── */
+function renderBarsResp(b){ window.AgroPlanner.Dashboard.renderBarsResp(b); }
+/* ── COLUMNAS APILADAS: PERSONAS POR ACTIVIDAD ── */
+function renderStackedAct(b){ window.AgroPlanner.Dashboard.renderStackedAct(b); }/* ── PIE CHART PERSONAL POR ÁREA ── */
 function renderAreaPie(byArea){
   const svg = document.getElementById('area-pie-svg');
   const legend = document.getElementById('area-pie-legend');
@@ -3403,9 +2998,11 @@ function renderAreaPie(byArea){
 
   svg.innerHTML = paths;
 
-  // En el nuevo layout el pie es fijo a 110px (tarjeta horizontal)
-  svg.style.width  = '72px';
-  svg.style.height = '72px';
+  // Tamaño por defecto — el VE lo sobreescribe si el usuario lo configuró
+  svg.style.width  = '112px';
+  svg.style.height = '112px';
+  const _pieCont = document.getElementById('area-pie-container');
+  if (_pieCont) { _pieCont.style.width = '112px'; _pieCont.style.height = '112px'; }
 
   legend.innerHTML = entries.map(([k,v],i)=>{
     return `<div style="display:flex;align-items:center;gap:4px;font-size:9.5px">
@@ -3417,173 +3014,9 @@ function renderAreaPie(byArea){
 }
 
 /* ── TABLA RESUMEN POR ACTIVIDAD ── */
-// renderResumen — delegada a Dashboard (Fase 4)
 function renderResumen(r){ window.AgroPlanner.Dashboard.renderResumen(r); }
-function _renderResumenOriginal(regs){
-  const tbody = document.getElementById('tbody-resumen');
-  if(!tbody) return;
-  if(!regs.length){
-    tbody.innerHTML=`<tr><td colspan="6" class="m-empty">Sin datos para el período.</td></tr>`;
-    return;
-  }
-  // Agrupar por actividad
-  const map = {};
-  regs.forEach(r=>{
-    const key = r.actividad||'Sin actividad';
-    if(!map[key]) map[key]={actividad:key,lotes:new Set(),personas:0,propio:0,contrata:0,contratasMap:{}};
-    const np=parseInt(r.nPersonas)||0;
-    map[key].personas+=np;
-    // Lotes: parsear números del string
-    if(r.lotes) String(r.lotes).match(/\d+/g)?.forEach(n=>map[key].lotes.add(n));
-    if(r.tipo==='Propio') map[key].propio+=np;
-    else if(r.tipo==='Contrata'){
-      map[key].contrata+=np;
-      const c=r.contratista||'Sin contratista';
-      map[key].contratasMap[c]=(map[key].contratasMap[c]||0)+np;
-    }
-  });
-  const rows = Object.values(map).sort((a,b)=>b.personas-a.personas);
-  tbody.innerHTML = rows.map(r=>{
-    const CONT_PALETTE=[
-      {bg:'#fff7ed',color:'#c2410c',border:'#fed7aa'},
-      {bg:'#fef2f2',color:'#b91c1c',border:'#fecaca'},
-      {bg:'#f5f3ff',color:'#6d28d9',border:'#ddd6fe'},
-      {bg:'#ecfeff',color:'#0e7490',border:'#a5f3fc'},
-      {bg:'#fff7ed',color:'#c2410c',border:'#fed7aa'},
-      {bg:'#fdf2f8',color:'#9d174d',border:'#fbcfe8'},
-    ];
-    const allContNames=[...new Set(regs.filter(r2=>r2.tipo==='Contrata').map(r2=>r2.contratista||'Sin contratista'))];
-    const contDetalle = r.contrata
-      ? Object.entries(r.contratasMap).map(([c,n])=>{
-          const idx=allContNames.indexOf(c);
-          const pal=CONT_PALETTE[idx%CONT_PALETTE.length];
-          return `<span style="display:inline-flex;align-items:center;gap:3px;background:${pal.bg};color:${pal.color};border:1px solid ${pal.border};border-radius:12px;padding:1px 7px;font-size:10px;font-weight:600;white-space:nowrap">${c}: ${n}</span>`;
-        }).join(' ')
-      : '—';
-    return `<tr>
-      <td style="font-weight:500;color:var(--text-main)">${r.actividad}</td>
-      <td style="font-family:var(--mono);color:var(--text-sec);font-size:11px">${[...r.lotes].sort((a,b)=>+a-+b).join(', ')||'—'}</td>
-      <td style="text-align:center;font-weight:700;font-size:12px;font-family:var(--mono);color:var(--green-dark)">${r.personas}</td>
-      <td style="text-align:center;color:#16a34a;font-weight:600;font-family:var(--mono)">${r.propio||'—'}</td>
-      <td style="text-align:center;color:#b45309;font-weight:600;font-family:var(--mono)">${r.contrata||'—'}</td>
-      <td style="font-size:11px">${contDetalle}</td>
-    </tr>`;
-  }).join('');
-}
-
 /* ── EVOLUCIÓN SEMANAL ── */
-// renderEvolucion — delegada a Dashboard (Fase 4)
 function renderEvolucion(){ window.AgroPlanner.Dashboard.renderEvolucion(); }
-function _renderEvolucionOriginal(){
-  const svg = document.getElementById('evolucion-svg');
-  if(!svg) return;
-
-  // Últimos 7 días
-  const dias = [];
-  for(let i=6;i>=0;i--){
-    const d=new Date(); d.setDate(d.getDate()-i);
-    const pad=n=>String(n).padStart(2,'0');
-    dias.push(d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate()));
-  }
-
-  const datos = dias.map(f=>{
-    const regsD = S.registros.filter(r=>r.fecha===f);
-    return {
-      fecha: f,
-      total: regsD.reduce((s,r)=>s+(parseInt(r.nPersonas)||0),0),
-      propio: regsD.filter(r=>r.tipo==='Propio').reduce((s,r)=>s+(parseInt(r.nPersonas)||0),0),
-      contrata: regsD.filter(r=>r.tipo==='Contrata').reduce((s,r)=>s+(parseInt(r.nPersonas)||0),0)
-    };
-  });
-
-  const W=svg.clientWidth||600, H=160;
-  const padL=36,padR=16,padT=16,padB=32;
-  const w=W-padL-padR, h=H-padT-padB;
-  const maxV=Math.max(...datos.map(d=>d.total),1);
-  const stepX=w/(datos.length-1);
-
-  const xp=i=>padL+i*stepX;
-  const yp=v=>padT+h-(v/maxV*h);
-
-  // Línea total (área rellena)
-  // Función para generar path suavizado (curvas cúbicas de Bezier)
-  const smoothPath = pts => {
-    if(pts.length < 2) return '';
-    let d = `M${pts[0][0]},${pts[0][1]}`;
-    for(let i=0;i<pts.length-1;i++){
-      const x0=pts[i][0], y0=pts[i][1];
-      const x1=pts[i+1][0], y1=pts[i+1][1];
-      const cpx = x0+(x1-x0)*0.5;
-      d += ` C${cpx},${y0} ${cpx},${y1} ${x1},${y1}`;
-    }
-    return d;
-  };
-
-  const ptsTotal=datos.map((d,i)=>[xp(i),yp(d.total)]);
-  const ptsP=datos.map((d,i)=>[xp(i),yp(d.propio)]);
-  const ptsC=datos.map((d,i)=>[xp(i),yp(d.contrata)]);
-
-  const pathTotal=smoothPath(ptsTotal);
-  const pathP=smoothPath(ptsP);
-  const pathC=smoothPath(ptsC);
-
-  const lastPt=ptsTotal[ptsTotal.length-1];
-  const firstPt=ptsTotal[0];
-  const areaPath=pathTotal+` L${lastPt[0].toFixed(1)},${(padT+h).toFixed(1)} L${firstPt[0].toFixed(1)},${(padT+h).toFixed(1)} Z`;
-
-  // Etiquetas eje X (dia/mes corto)
-  const labelX=datos.map((d,i)=>{
-    const [,mm,dd]=d.fecha.split('-');
-    return `<text x="${xp(i).toFixed(1)}" y="${H-8}" text-anchor="middle" font-size="9" fill="var(--text-label)" font-family="var(--font)">${dd}/${mm}</text>`;
-  }).join('');
-
-  // Grid lines + etiquetas Y
-  const yTicks=[0, Math.round(maxV/2), maxV];
-  const gridLines=yTicks.map(v=>`
-    <line x1="${padL}" y1="${yp(v).toFixed(1)}" x2="${W-padR}" y2="${yp(v).toFixed(1)}"
-      stroke="var(--border-base)" stroke-width="1" stroke-dasharray="3,3"/>
-    <text x="${padL-6}" y="${(yp(v)+3).toFixed(1)}" text-anchor="end" font-size="9" fill="var(--text-label)" font-family="var(--mono)">${v}</text>
-  `).join('');
-
-  // Puntos sobre línea total con tooltip
-  const dots=datos.map((d,i)=>{
-    if(d.total===0) return '';
-    return `<circle cx="${ptsTotal[i][0].toFixed(1)}" cy="${ptsTotal[i][1].toFixed(1)}" r="4" fill="var(--green-dark)" stroke="#fff" stroke-width="2">
-      <title>${d.fecha}: ${d.total} personas (P:${d.propio} / C:${d.contrata})</title>
-    </circle>`;
-  }).join('');
-
-  svg.setAttribute('viewBox',`0 0 ${W} ${H}`);
-  svg.innerHTML=`
-    <defs>
-      <linearGradient id="gradArea" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0%" stop-color="var(--green-bright)" stop-opacity="0.25"/>
-        <stop offset="100%" stop-color="var(--green-bright)" stop-opacity="0.02"/>
-      </linearGradient>
-    </defs>
-    ${gridLines}
-    <path d="${areaPath}" fill="url(#gradArea)"/>
-    <path d="${pathC}" fill="none" stroke="#fcd34d" stroke-width="1.5" stroke-dasharray="4,3" stroke-linecap="round" opacity=".8"/>
-    <path d="${pathP}" fill="none" stroke="#4a9960" stroke-width="1.5" stroke-linecap="round" opacity=".9"/>
-    <path d="${pathTotal}" fill="none" stroke="var(--green-dark)" stroke-width="2.5" stroke-linecap="round"/>
-    ${dots}
-    ${labelX}
-    <text x="${padL}" y="${H-8}" text-anchor="middle" font-size="9" fill="transparent">·</text>`;
-
-  // Leyenda inline debajo
-  const leyWrap=document.getElementById('evolucion-wrap');
-  if(leyWrap && !document.getElementById('evol-leyenda')){
-    const ley=document.createElement('div');
-    ley.id='evol-leyenda';
-    ley.style.cssText='display:flex;gap:1.25rem;margin-top:.5rem;font-size:11px;color:var(--text-sec)';
-    ley.innerHTML=`
-      <span style="display:flex;align-items:center;gap:5px"><span style="width:16px;height:3px;background:var(--green-dark);border-radius:2px;display:inline-block"></span>Total</span>
-      <span style="display:flex;align-items:center;gap:5px"><span style="width:16px;height:3px;background:#4a9960;border-radius:2px;display:inline-block"></span>Propio</span>
-      <span style="display:flex;align-items:center;gap:5px"><span style="width:16px;height:3px;background:#fcd34d;border-radius:2px;border:1px dashed #b45309;display:inline-block"></span>Contrata</span>`;
-    leyWrap.appendChild(ley);
-  }
-}
-
 function exportarUltimosRegistros(){
   const filtro=getSegFiltro();
   const regs=[...S.registros.filter(filtro)].reverse();
@@ -3778,9 +3211,8 @@ function applySidebarState(){
 }
 
 /* ── SEARCHABLE SELECT ENGINE ── */
-// SS engine — delegado a SearchableSelect (Fase 3)
-// Las funciones siguen disponibles globalmente para los atributos oninput/onfocus/onblur del HTML
-const SS_DATA = {}; // alias legacy — los datos viven en searchable-select.js
+// Motor SS — funciones disponibles globalmente para atributos oninput/onfocus/onblur
+const SS_DATA = {}; // estado interno en searchable-select.js
 function ssLoad(id, lista)            { window.AgroPlanner.SS.ssLoad(id, lista); }
 function ssReset(id)                  { window.AgroPlanner.SS.ssReset(id); }
 function ssOpen(id)                   { window.AgroPlanner.SS.ssOpen(id); }
@@ -3832,8 +3264,8 @@ function setTurno(val, prefix){
   }
 }
 
-/* ── SSM — MULTISELECT ENGINE (Lotes) — delegado a MultiSelect (Fase 3) ── */
-const SSM_SEL = {}; // alias legacy — el estado vive en multi-select.js
+/* ── SSM — MULTISELECT ENGINE (Lotes) ── */
+const SSM_SEL = {}; // estado interno en multi-select.js
 
 function ssmGetLotes(id){ return getGruposModulo().flatMap(g=>g.lotes); }
 function ssmOpen(id)                    { window.AgroPlanner.SSM.ssmOpen(id); }
@@ -4500,8 +3932,7 @@ function abrirModalUser(id=null){
 function exportarUsuarios(){
   const items = DB.usuarios || [];
   if(!items.length){ toast('Sin datos para exportar', 'err'); return; }
-  /* PARCHE-5: no exportar contraseñas (ni hash ni texto plano) */
-  const ws = XLSX.utils.aoa_to_sheet([
+    const ws = XLSX.utils.aoa_to_sheet([
     ['DNI', 'Apellidos y Nombres', 'Usuario', 'Rol', 'Estado'],
     ...items.map(u => [u.dni||'', u.nombre||'', u.usuario||'', u.rol||'', u.estado||'Activo'])
   ]);
@@ -4553,7 +3984,7 @@ function abrirModalUser(id=null){
 
 function cerrarModalUser(){document.getElementById('modal-user').classList.remove('open');}
 
-async function guardarUser(){ /* PARCHE-5: async para hash SHA-256 */
+async function guardarUser(){
   const nombre=document.getElementById('mu-nombre').value.trim();
   const usuario=document.getElementById('mu-usuario').value.trim();
   const pass=document.getElementById('mu-pass').value.trim();
@@ -4571,8 +4002,7 @@ async function guardarUser(){ /* PARCHE-5: async para hash SHA-256 */
     reportes:rol==='admin'||document.getElementById('p-reportes').checked,
     exportar:rol==='admin'||document.getElementById('p-exportar').checked,
   };
-  /* PARCHE-5: hashear contraseña con SHA-256 antes de guardar */
-  const hashedPass = await window.AgroPlanner.storage.hashPassword(pass);
+    const hashedPass = await window.AgroPlanner.storage.hashPassword(pass);
   if(S.editUserId){
     const u=DB.usuarios.find(x=>x.id===S.editUserId);
     u.nombre=nombre;u.usuario=usuario;u.password=hashedPass;u.rol=rol;u.estado=estado;u.perms=perms;
@@ -4588,7 +4018,7 @@ async function guardarUser(){ /* PARCHE-5: async para hash SHA-256 */
 function delUser(id){DB.usuarios=DB.usuarios.filter(u=>u.id!==id);save();renderUsuarios();toast('Usuario eliminado');pushUsuariosASheets().catch(()=>toast('Eliminado local. Error al sincronizar Sheets.','err'));}
 
 /* ── CONFIRM ── */
-/* PARCHE-4: helper de sanitización de HTML para prevenir XSS */
+/* Helper de sanitización HTML — previene XSS en modales de confirmación */
 function _sanitizeHTML(str){
   if(!str) return '';
   return String(str)
@@ -4614,9 +4044,11 @@ function iniciarApp(){
   renderInicio();
   initForm();
   cargarRegistros();
-  // Reajustar pie cuando cambia el tamaño del contenedor
+  // ResizeObserver: re-renderiza el pie de área cuando el contenedor cambia de tamaño.
+  // Soluciona el problema de tamaño pequeño en el primer render (contenedor aún no pintado).
   const wrap = document.getElementById('area-pie-wrap');
   if(wrap && window.ResizeObserver){
+    // Solo ajusta el tamaño del SVG — el contenido lo maneja el pipeline normal de render
     new ResizeObserver(()=>{
       const svg = document.getElementById('area-pie-svg');
       if(!svg) return;
@@ -4627,11 +4059,9 @@ function iniciarApp(){
   }
 }
 
-/* script temporal para pruebas */
 
-/* _hashPassword, _verifyPassword, _migrarPasswordsLegacy → movidas a AuthService + storage.service.js */
 
-/* Login activo — sin bypass */
+/* ═══════════ ARRANQUE ═══════════ */
 window.onload = async function() {
   // Migrar passwords legacy a SHA-256 (se ejecuta una vez, no destructivo)
   const migrated = await window.AgroPlanner.AuthService.migratePasswords(DB.usuarios);
@@ -5198,7 +4628,6 @@ async function descargarPDF(){
 }
 
 
-// reemplazarRegistrosEnSheets — delegada a SheetsService.enviarHojaRegistros
 async function reemplazarRegistrosEnSheets(){
   try{
     await window.AgroPlanner.SheetsService.enviarHojaRegistros(S.registros, CFG.APPS_SCRIPT_URL);
@@ -5446,7 +4875,7 @@ const VE=(()=>{
   /* ── Tabs Área ── */
   function tAD(c){
     return G('Gráfico donut',[
-      fR('Tamaño (px)','ds',c.ds||72,50,130),
+      fR('Tamaño (px)','ds',c.ds||112,50,130),
       fR('Grosor del anillo (%)','donutThick',c.donutThick||58,15,85,'%')
     ])+G('Leyenda',[
       fG('Mostrar leyenda','sl',c.sl),
@@ -5539,7 +4968,7 @@ const VE=(()=>{
 
     if(type==='kpi-area'){
       const svg=el.querySelector('#area-pie-svg');
-      if(svg&&c.ds){ svg.style.width=c.ds+'px'; svg.style.height=c.ds+'px'; }
+      if(svg&&c.ds){ svg.style.width=c.ds+'px'; svg.style.height=c.ds+'px'; const cont=document.getElementById('area-pie-container'); if(cont){cont.style.width=c.ds+'px';cont.style.height=c.ds+'px';} }
       const leg=el.querySelector('#area-pie-legend');
       if(leg){
         if(c.sl===false) leg.style.display='none';
@@ -5549,6 +4978,8 @@ const VE=(()=>{
       // Re-render del donut si cambia grosor
       if(c.donutThick!==undefined){
         try{ renderInicio(); }catch(e){}
+        // Re-aplicar estilos VE porque renderInicio() los sobreescribe
+        requestAnimationFrame(()=>applyAllFrom(draft));
       }
     }
 
@@ -5618,11 +5049,13 @@ const VE=(()=>{
     if(kFoco) kFoco.style.cssText='font-size:18px;line-height:1.25;word-break:break-word;color:var(--text-main);font-family:var(--font);font-weight:700';
     // Restaurar donut
     const svg=document.getElementById('area-pie-svg');
-    if(svg){ svg.style.width='72px'; svg.style.height='72px'; }
+    if(svg){ svg.style.width='112px'; svg.style.height='112px'; }
     const leg=document.getElementById('area-pie-legend');
     if(leg){ leg.removeAttribute('style'); }
     // Re-render inmediato
     try{ renderInicio(); }catch(e){}
+    // Re-aplicar estilos VE porque renderInicio() los sobreescribe
+    requestAnimationFrame(()=>applyAllFrom(snapshot));
     if(sel) renderPanel();
     toast('Cambios restablecidos ✓','ok');
   }
@@ -5660,7 +5093,7 @@ const VE=(()=>{
       if(c.si===false) css+=`${s} .kpi-icon{display:none!important}\n`;
       if(c.ss===false) css+=`${s} .kpi-h{display:none!important}\n`;
       if(c.sl===false) css+=`${s} #area-pie-legend{display:none!important}\n`;
-      if(c.ds) css+=`${s} #area-pie-svg{width:${c.ds}px!important;height:${c.ds}px!important}\n`;
+      if(c.ds) css+=`${s} #area-pie-svg{width:${c.ds}px!important;height:${c.ds}px!important}\n${s} #area-pie-container{width:${c.ds}px!important;height:${c.ds}px!important}\n`;
     });
 
     // Aplicar labelText al DOM antes de serializar

@@ -195,11 +195,11 @@ export const Dashboard = Object.freeze({
     this.renderAreaPie(byArea);
     this.renderEvolucion();
     this.renderResumen(regs);
-    if (typeof _renderDonutOriginal === 'function') _renderDonutOriginal(propio, contrata, total);
-    else this.renderDonut(propio, contrata, total);
+    this.renderDonut(propio, contrata, total);
     requestAnimationFrame(() => {
       this.renderStackedAct(byADesglose);
       this.renderBarsResp(byResp);
+
     });
   },
 
@@ -221,8 +221,8 @@ export const Dashboard = Object.freeze({
 
   /** Gráfico donut propio/contrata */
   renderDonut(propio, contrata, total) {
-    const svg    = document.getElementById('area-pie-svg');
-    const legend = document.getElementById('area-pie-legend');
+    const svg    = document.getElementById('donut-svg');
+    const legend = document.getElementById('donut-legend');
     if (!svg || !legend) return;
     const cx = 55, cy = 55, r = 40, stroke = 14;
     svg.setAttribute('viewBox', '-1 -1 112 112');
@@ -297,30 +297,25 @@ export const Dashboard = Object.freeze({
     }).join('');
   },
 
-  /** Pie chart de áreas — delega al monolito para mantener la implementación original */
+  /** Pie chart de áreas — delegada a renderAreaPie del monolito */
   renderAreaPie(byArea) {
-    if (typeof renderAreaPie === 'function') { renderAreaPie(byArea); return; }
-    // Fallback simple si el monolito no tiene la función
-    const el = document.getElementById('area-pie-legend');
-    if (!el) return;
-    el.innerHTML = Object.entries(byArea).sort((a,b)=>b[1]-a[1])
-      .map(([k,v])=>`<div style="font-size:11px">${k}: ${v}</div>`).join('');
+    if (typeof window.renderAreaPie === 'function') {
+      window.renderAreaPie(byArea);
+    }
   },
 
-  /** Barras apiladas por actividad — delega al monolito para usar su implementación */
+  /** Barras apiladas por actividad — delegada a renderStackedActImpl del monolito */
   renderStackedAct(byADesglose) {
-    if (typeof _renderStackedActOriginal === 'function') { _renderStackedActOriginal(byADesglose); return; }
-    const container = document.getElementById('stacked-act');
-    if (!container) return;
-    container.innerHTML = '<div style="font-size:12px;color:var(--text-muted)">Sin datos.</div>';
+    if (typeof window.renderStackedActImpl === 'function') {
+      window.renderStackedActImpl(byADesglose);
+    }
   },
 
-  /** Barras de responsables — delega al monolito para usar su implementación */
+  /** Barras de responsables — delegada a renderBarsRespImpl del monolito */
   renderBarsResp(byResp) {
-    if (typeof _renderBarsRespOriginal === 'function') { _renderBarsRespOriginal(byResp); return; }
-    const el = document.getElementById('bars-resp');
-    if (!el) return;
-    el.innerHTML = '<div style="font-size:12px;color:var(--text-muted)">Sin datos.</div>';
+    if (typeof window.renderBarsRespImpl === 'function') {
+      window.renderBarsRespImpl(byResp);
+    }
   },
 
   /** Barras duales — delega al monolito para usar su implementación */

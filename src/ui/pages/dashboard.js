@@ -70,21 +70,39 @@ const CONTRATA_COLORS = ['#b45309','#d97706','#c2410c','#9d174d','#6d28d9','#0e7
 
 export const Dashboard = Object.freeze({
 
-  /** Inicializa los filtros de fecha del dashboard */
+  /** Inicializa los filtros del dashboard */
   initFiltros() {
-    const fd = document.getElementById('fil-dash-desde');
-    const fh = document.getElementById('fil-dash-hasta');
+    const fd  = document.getElementById('fil-dash-desde');
+    const fh  = document.getElementById('fil-dash-hasta');
     const hoy = isoHoy();
     if (fd && !fd.value) fd.value = hoy;
     if (fh && !fh.value) fh.value = hoy;
-    // Cargar opciones de actividad — siempre recargar para reflejar maestros actualizados
-    const acts = (_getMaestroActividades() || [])
-      .map(a => typeof a === 'string' ? a : (a.actividad || '')).filter(Boolean);
-    if (typeof window.ssLoad === 'function') window.ssLoad('fil-dash-act', acts);
-    // Cargar opciones de área
-    const areas = (window.DB?.maestros?.areas || [])
-      .map(a => typeof a === 'string' ? a : (a.nombre || '')).filter(Boolean);
-    if (typeof window.ssLoad === 'function') window.ssLoad('fil-dash-area', areas);
+    // Cargar áreas disponibles en el rango de fechas seleccionado
+    this._recargarFiltros();
+  },
+
+  /** Recarga las opciones de área y actividad según fechas y selección actual */
+  _recargarFiltros() {
+    const MSF   = window.AgroPlanner?.MSF;
+    if (!MSF) return;
+    const regs  = _getRegistros();
+    const desde = document.getElementById('fil-dash-desde')?.value || isoHoy();
+    const hasta = document.getElementById('fil-dash-hasta')?.value || isoHoy();
+
+    // Filtrar por fecha para mostrar solo áreas/actividades del período
+    const regsFecha = regs.filter(r => r.fecha >= desde && r.fecha <= hasta);
+
+    // Áreas únicas en el período
+    const areas = [...new Set(regsFecha.map(r => r.area).filter(Boolean))].sort();
+    MSF.load('fil-dash-area', areas);
+
+    // Actividades en cascada: filtrar por áreas seleccionadas si hay alguna
+    const areasSeleccionadas = MSF.getSelected('fil-dash-area');
+    const regsFiltrados = areasSeleccionadas.length
+      ? regsFecha.filter(r => areasSeleccionadas.includes(r.area))
+      : regsFecha;
+    const acts = [...new Set(regsFiltrados.map(r => r.actividad).filter(Boolean))].sort();
+    MSF.load('fil-dash-act', acts);
   },
 
   /** Retorna la función de filtro activa según los controles del dashboard */
@@ -92,12 +110,13 @@ export const Dashboard = Object.freeze({
     const hoy   = isoHoy();
     const desde = document.getElementById('fil-dash-desde')?.value || hoy;
     const hasta = document.getElementById('fil-dash-hasta')?.value || hoy;
-    const act   = document.getElementById('fil-dash-act')?.value  || '';
-    const area  = document.getElementById('fil-dash-area')?.value || '';
+    const MSF   = window.AgroPlanner?.MSF;
+    const areas = MSF ? MSF.getSelected('fil-dash-area') : [];
+    const acts  = MSF ? MSF.getSelected('fil-dash-act')  : [];
     return r => {
-      if (r.fecha < desde || r.fecha > hasta) return false;
-      if (act  && r.actividad !== act)  return false;
-      if (area && r.area      !== area) return false;
+      if (r.fecha < desde || r.fecha > hasta)                   return false;
+      if (areas.length && !areas.includes(r.area))              return false;
+      if (acts.length  && !acts.includes(r.actividad))          return false;
       return true;
     };
   },
@@ -107,6 +126,7 @@ export const Dashboard = Object.freeze({
     const titleEl = document.getElementById('inicio-fecha');
     if (titleEl) titleEl.textContent = fechaLarga();
     this.initFiltros();
+    this._recargarFiltros();
 
     const filtro  = this.getSegFiltro();
     const regs    = _getRegistros().filter(filtro);

@@ -22,6 +22,7 @@ import { SheetsService }  from './services/sheets.service.js';
 import { toast, sync }    from './ui/components/toast.js';
 import { ssLoad, ssGetValue, ssReset, ssOpen, ssBlur, ssCloseOne, ssCloseAll, ssInputFilter, ssFilter, ssRenderList, ssPick, ssClear } from './ui/components/searchable-select.js';
 import { ssmLoad, ssmOpen, ssmClose, ssmFilter, ssmRender, ssmToggle, ssmToggleAll, ssmUpdateTags, ssmGetSelected, ssmReset, ssmGetCount, ssmSetSelected } from './ui/components/multi-select.js';
+import { MSF }            from './ui/components/multi-select-filter.js';
 import { Dashboard }      from './ui/pages/dashboard.js';
 import { Reportes }       from './ui/pages/reportes.js';
 import { Nav }            from './ui/pages/nav.js';
@@ -49,6 +50,7 @@ window.AgroPlanner = {
   Toast:         { toast, sync },
   SS:            { ssLoad, ssGetValue, ssReset, ssOpen, ssBlur, ssCloseOne, ssCloseAll, ssInputFilter, ssFilter, ssRenderList, ssPick, ssClear },
   SSM:           { ssmLoad, ssmOpen, ssmClose, ssmFilter, ssmRender, ssmToggle, ssmToggleAll, ssmUpdateTags, ssmGetSelected, ssmReset, ssmGetCount, ssmSetSelected },
+  MSF,
   Dashboard,
   Reportes,
   Nav,

@@ -180,7 +180,7 @@ export function ssRenderList(id, q) {
     const div = document.createElement('div');
     div.className = 'ss-opt' + (!cur ? ' selected' : '');
     div.textContent = todasLabel;
-    div.addEventListener('mousedown', () => ssPick(id, ''));
+    div.addEventListener('mousedown', () => { const fn = typeof window.ssPick === 'function' ? window.ssPick : ssPick; fn(id, ''); });
     list.appendChild(div);
   }
 
@@ -196,7 +196,7 @@ export function ssRenderList(id, q) {
     const div = document.createElement('div');
     div.className = 'ss-opt' + (cur === o ? ' selected' : '');
     div.textContent = o;
-    div.addEventListener('mousedown', () => ssPick(id, o));
+    div.addEventListener('mousedown', () => { const fn = typeof window.ssPick === 'function' ? window.ssPick : ssPick; fn(id, o); });
     list.appendChild(div);
   });
 }

@@ -577,6 +577,33 @@ tr.reg-selected td{background:rgba(74,153,96,.06)!important}
 .ve-bar-open{padding-top:40px!important}
 .ve-panel-open #page-inicio{margin-right:300px;transition:margin .25s}
 /* ══ FIN VISUAL EDITOR ══ */
+
+/* ── MULTI-SELECT FILTER (MSF) — Filtros dashboard ── */
+.msf-wrap{position:relative;width:100%}
+.msf-input-box{display:flex;align-items:center;gap:6px;background:var(--bg-input);border:1px solid var(--border-hover);border-radius:var(--r);padding:0 10px;height:34px;cursor:pointer;transition:border-color .15s;box-sizing:border-box;overflow:hidden}
+.msf-wrap.msf-open .msf-input-box{border-color:var(--primary);box-shadow:0 0 0 2px rgba(74,153,96,.12)}
+.msf-input-box input{flex:1;background:none;border:none;outline:none;font-size:12px;font-family:var(--font);color:var(--text-main);cursor:pointer;min-width:0}
+.msf-input-box input::placeholder{color:var(--text-muted)}
+.msf-input-box .msf-arrow{width:14px;height:14px;flex-shrink:0;color:var(--text-muted);transition:transform .2s}
+.msf-wrap.msf-open .msf-arrow{transform:rotate(180deg)}
+.msf-input-box .msf-clear-btn{background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:14px;padding:0;line-height:1;display:none}
+.msf-wrap.msf-has-value .msf-clear-btn{display:block}
+.msf-drop{display:none;position:absolute;top:calc(100% + 4px);left:0;right:0;background:var(--bg-panel);border:1px solid var(--border-base);border-radius:var(--r);box-shadow:0 4px 16px rgba(0,0,0,.1);z-index:200;overflow:hidden}
+.msf-wrap.msf-open .msf-drop{display:block}
+.msf-drop input.msf-search{width:100%;padding:8px 12px;border:none;border-bottom:1px solid var(--border-base);background:var(--bg-input);font-size:12px;font-family:var(--font);color:var(--text-main);outline:none}
+.msf-list{max-height:200px;overflow-y:auto}
+.msf-opt{display:flex;align-items:center;gap:8px;padding:7px 12px;cursor:pointer;font-size:12px;color:var(--text-main);transition:background .1s}
+.msf-opt:hover{background:var(--primary-bg)}
+.msf-opt.selected{background:rgba(74,153,96,.06)}
+.msf-chk{width:14px;height:14px;border-radius:3px;border:1.5px solid var(--border-hover);flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:all .15s}
+.msf-opt.selected .msf-chk{background:var(--green-bright);border-color:var(--green-bright)}
+.msf-opt-label{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.msf-tags{display:flex;flex-wrap:wrap;gap:4px;min-height:0;width:100%}
+.msf-tags-inline{display:flex;gap:3px;align-items:center;flex-shrink:0;max-width:70%;overflow:hidden;flex-wrap:nowrap}
+.msf-tags-inline .msf-tag{display:inline-flex;align-items:center;gap:3px;background:var(--primary-bg);color:var(--green-dark);border:1px solid var(--primary-b);border-radius:4px;padding:1px 6px;font-size:10px;font-weight:600;white-space:nowrap;max-width:120px;overflow:hidden;text-overflow:ellipsis}
+.msf-tags-inline .msf-tag button{background:none;border:none;cursor:pointer;color:var(--green-mid);padding:0;font-size:11px;line-height:1;flex-shrink:0}
+.msf-tag{display:inline-flex;align-items:center;gap:4px;background:var(--primary-bg);color:var(--green-dark);border:1px solid var(--primary-b);border-radius:6px;padding:2px 8px;font-size:11px;font-weight:600}
+.msf-tag button{background:none;border:none;cursor:pointer;color:var(--green-mid);padding:0;font-size:13px;line-height:1;display:flex;align-items:center}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -727,38 +754,44 @@ tr.reg-selected td{background:rgba(74,153,96,.06)!important}
             <svg id="filtros-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;color:var(--text-label);transition:transform .2s"><polyline points="6 9 12 15 18 9"/></svg>
           </button>
           <div id="filtros-body" style="display:none;padding:.75rem 1.25rem 1rem;border-top:1px solid var(--border-base)">
-            <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:1rem;align-items:end">
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:1rem;align-items:start">
               <div class="field" style="margin-bottom:0">
                 <label>Fecha desde</label>
-                <input type="date" id="fil-dash-desde" onchange="renderInicio()" style="width:100%;padding:8px 10px;background:var(--bg-input);border:1px solid var(--border-hover);border-radius:var(--r);font-size:12px;font-family:var(--font);color:var(--text-main);outline:none">
+                <input type="date" id="fil-dash-desde" onchange="renderInicio()" style="width:100%;padding:0 10px;height:34px;background:var(--bg-input);border:1px solid var(--border-hover);border-radius:var(--r);font-size:12px;font-family:var(--font);color:var(--text-main);outline:none;box-sizing:border-box">
               </div>
               <div class="field" style="margin-bottom:0">
                 <label>Fecha hasta</label>
-                <input type="date" id="fil-dash-hasta" onchange="renderInicio()" style="width:100%;padding:8px 10px;background:var(--bg-input);border:1px solid var(--border-hover);border-radius:var(--r);font-size:12px;font-family:var(--font);color:var(--text-main);outline:none">
+                <input type="date" id="fil-dash-hasta" onchange="renderInicio()" style="width:100%;padding:0 10px;height:34px;background:var(--bg-input);border:1px solid var(--border-hover);border-radius:var(--r);font-size:12px;font-family:var(--font);color:var(--text-main);outline:none;box-sizing:border-box">
               </div>
               <div class="field" style="margin-bottom:0">
                 <label>Área</label>
-                <div class="ss-wrap" id="ss-wrap-fil-dash-area">
-                  <input class="ss-input" id="ss-fil-dash-area" placeholder="--Todas--" autocomplete="off" oninput="ssInputFilter('fil-dash-area',this.value)" onfocus="ssOpen('fil-dash-area')" onblur="ssBlur('fil-dash-area')">
-                  <div class="ss-icons"><button type="button" class="ss-clear" id="ss-clr-fil-dash-area" onclick="ssClear('fil-dash-area')" tabindex="-1">&#x2715;</button><svg class="ss-arrow" id="ss-arr-fil-dash-area" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px"><polyline points="6 9 12 15 18 9"/></svg></div>
-                  <div class="ss-drop" id="ss-drop-fil-dash-area">
-                    <input class="ss-search" placeholder="Buscar área…" oninput="ssFilter('fil-dash-area',this.value)" id="ss-search-fil-dash-area">
-                    <div class="ss-list" id="ss-list-fil-dash-area"></div>
+                <div class="msf-wrap" id="msf-wrap-fil-dash-area">
+                  <div class="msf-input-box" onclick="window.AgroPlanner.MSF.open('fil-dash-area')">
+                    <div id="msf-tags-fil-dash-area" class="msf-tags-inline"></div>
+                    <input id="msf-input-fil-dash-area" placeholder="--Todas--" readonly style="cursor:pointer;flex:1;min-width:0;background:none;border:none;outline:none;font-size:12px;font-family:var(--font);color:var(--text-main)">
+                    <button type="button" class="msf-clear-btn" onmousedown="event.stopPropagation();window.AgroPlanner.MSF.clear('fil-dash-area')" tabindex="-1">&#x2715;</button>
+                    <svg class="msf-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+                  </div>
+                  <div class="msf-drop" id="msf-drop-fil-dash-area">
+                    <input class="msf-search" id="msf-search-fil-dash-area" placeholder="Buscar área…" oninput="window.AgroPlanner.MSF.filter('fil-dash-area',this.value)">
+                    <div class="msf-list" id="msf-list-fil-dash-area"></div>
                   </div>
                 </div>
-                <input type="hidden" id="fil-dash-area">
               </div>
               <div class="field" style="margin-bottom:0">
                 <label>Actividad</label>
-                <div class="ss-wrap" id="ss-wrap-fil-dash-act">
-                  <input class="ss-input" id="ss-fil-dash-act" placeholder="--Todas--" data-placeholder="Todas las actividades…" autocomplete="off" oninput="ssInputFilter('fil-dash-act',this.value)" onfocus="ssOpen('fil-dash-act')" onblur="ssBlur('fil-dash-act')">
-                  <div class="ss-icons"><button type="button" class="ss-clear" id="ss-clr-fil-dash-act" onclick="ssClear('fil-dash-act')" tabindex="-1">&#x2715;</button><svg class="ss-arrow" id="ss-arr-fil-dash-act" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px"><polyline points="6 9 12 15 18 9"/></svg></div>
-                  <div class="ss-drop" id="ss-drop-fil-dash-act">
-                    <input class="ss-search" placeholder="Buscar actividad…" oninput="ssFilter('fil-dash-act',this.value)" id="ss-search-fil-dash-act">
-                    <div class="ss-list" id="ss-list-fil-dash-act"></div>
+                <div class="msf-wrap" id="msf-wrap-fil-dash-act">
+                  <div class="msf-input-box" onclick="window.AgroPlanner.MSF.open('fil-dash-act')">
+                    <div id="msf-tags-fil-dash-act" class="msf-tags-inline"></div>
+                    <input id="msf-input-fil-dash-act" placeholder="--Todas--" readonly style="cursor:pointer;flex:1;min-width:0;background:none;border:none;outline:none;font-size:12px;font-family:var(--font);color:var(--text-main)">
+                    <button type="button" class="msf-clear-btn" onmousedown="event.stopPropagation();window.AgroPlanner.MSF.clear('fil-dash-act')" tabindex="-1">&#x2715;</button>
+                    <svg class="msf-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+                  </div>
+                  <div class="msf-drop" id="msf-drop-fil-dash-act">
+                    <input class="msf-search" id="msf-search-fil-dash-act" placeholder="Buscar actividad…" oninput="window.AgroPlanner.MSF.filter('fil-dash-act',this.value)">
+                    <div class="msf-list" id="msf-list-fil-dash-act"></div>
                   </div>
                 </div>
-                <input type="hidden" id="fil-dash-act">
               </div>
             </div>
           </div>
